@@ -1,0 +1,31 @@
+import type { Metadata } from "next";
+import { CopticCross } from "@/components/layout/CopticCross";
+import { LoginForm } from "./LoginForm";
+
+export const metadata: Metadata = { title: "تسجيل الدخول" };
+
+export default function LoginPage() {
+  return (
+    <div className="flex min-h-dvh items-center justify-center bg-bg-alt coptic-pattern px-4 py-10">
+      <div className="w-full max-w-md animate-fade-in-up">
+        <div className="mb-7 flex flex-col items-center text-center">
+          <div className="mb-4 flex size-16 items-center justify-center rounded-[var(--radius-lg)] bg-surface text-primary shadow-[var(--shadow-md)]">
+            <CopticCross className="size-9" />
+          </div>
+          <h1 className="text-xl font-extrabold text-ink">خدمة التربية الكنسية</h1>
+          <p className="mt-1 text-sm text-ink-muted">كنيسة رئيس الملائكة الجليل ميخائيل بدمنهور</p>
+        </div>
+
+        <div className="rounded-[var(--radius-xl)] border border-border bg-surface p-6 shadow-[var(--shadow-lg)] sm:p-8">
+          <h2 className="mb-1 text-lg font-bold text-ink">تسجيل الدخول</h2>
+          <p className="mb-6 text-sm text-ink-muted">من فضلك أدخل بياناتك للوصول إلى حسابك</p>
+          <LoginForm />
+        </div>
+
+        <p className="mt-6 text-center text-xs text-ink-faint">
+          &ldquo;ليس لي فرح أعظم من هذا: أن أسمع عن أولادي أنهم يسلكون بالحق&rdquo; (3يو 1: 4)
+        </p>
+      </div>
+    </div>
+  );
+}

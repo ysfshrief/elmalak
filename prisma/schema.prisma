@@ -1,0 +1,159 @@
+// Prisma schema — خدمة التربية الكنسية (كنيسة رئيس الملائكة الجليل ميخائيل بدمنهور)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  STAGE_COORDINATOR
+  FAMILY_SERVANT
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  EXCUSED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  username     String   @unique
+  passwordHash String
+  role         Role
+  phone        String?
+  isActive     Boolean  @default(true)
+
+  stageId String?
+  stage   Stage?  @relation(fields: [stageId], references: [id])
+
+  assignments FamilyAssignment[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lastLoginAt DateTime?
+}
+
+model Stage {
+  id    String @id @default(cuid())
+  name  String @unique
+  order Int    @default(0)
+
+  families     Family[]
+  coordinators User[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Family {
+  id      String @id @default(cuid())
+  name    String
+  stageId String
+  stage   Stage  @relation(fields: [stageId], references: [id])
+
+  members     Member[]
+  sessions    AttendanceSession[]
+  visitations VisitationRecord[]
+  assignments FamilyAssignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FamilyAssignment {
+  id       String @id @default(cuid())
+  userId   String
+  familyId String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  family   Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, familyId])
+}
+
+model Member {
+  id               String    @id @default(cuid())
+  familyId         String
+  family           Family    @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  fullName         String
+  address          String?
+  birthDate        DateTime?
+  school           String?
+  confessionFather String?
+  notes            String?
+  isActive         Boolean   @default(true)
+
+  phones            MemberPhone[]
+  attendanceRecords AttendanceRecord[]
+  visitations       VisitationRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MemberPhone {
+  id       String @id @default(cuid())
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  label    String
+  number   String
+}
+
+model AttendanceSession {
+  id       String   @id @default(cuid())
+  familyId String
+  family   Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  date     DateTime
+  label    String?
+
+  createdById String?
+
+  records AttendanceRecord[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([familyId, date])
+}
+
+model AttendanceRecord {
+  id        String            @id @default(cuid())
+  sessionId String
+  session   AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  memberId  String
+  member    Member            @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  status    AttendanceStatus  @default(ABSENT)
+  note      String?
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([sessionId, memberId])
+}
+
+model VisitationRecord {
+  id       String @id @default(cuid())
+  familyId String
+  family   Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  year    Int
+  month   Int
+  visited Boolean   @default(false)
+  visitedAt DateTime?
+  note    String?
+
+  recordedById String?
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([memberId, year, month])
+}
