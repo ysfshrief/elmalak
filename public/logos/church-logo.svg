@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="شعار كنيسة رئيس الملائكة الجليل ميخائيل بدمنهور">
+  <title>كنيسة رئيس الملائكة الجليل ميخائيل بدمنهور</title>
+  <defs>
+    <path id="petal" d="M 0,-119 C 33,-119 47,-89 47,-61 C 47,-42 41,-31 31,-25 L 31,9 L -31,9 L -31,-25 C -41,-31 -47,-42 -47,-61 C -47,-89 -33,-119 0,-119 Z" />
+  </defs>
+  <g transform="translate(120,120)">
+    <!-- 4 petals (beaded gold border, cream fill) -->
+    <g fill="#FBF7EC" stroke="#AB8324" stroke-width="3">
+      <use href="#petal" transform="rotate(0)" />
+      <use href="#petal" transform="rotate(90)" />
+      <use href="#petal" transform="rotate(180)" />
+      <use href="#petal" transform="rotate(270)" />
+    </g>
+    <g fill="none" stroke="#C9A646" stroke-width="2.5" stroke-dasharray="0.2 7" stroke-linecap="round">
+      <use href="#petal" transform="rotate(0) scale(0.93)" />
+      <use href="#petal" transform="rotate(90) scale(0.93)" />
+      <use href="#petal" transform="rotate(180) scale(0.93)" />
+      <use href="#petal" transform="rotate(270) scale(0.93)" />
+    </g>
+
+    <!-- center medallion -->
+    <circle r="60" fill="#FBF7EC" stroke="#AB8324" stroke-width="3.5" />
+    <circle r="53" fill="none" stroke="#C9A646" stroke-width="2" stroke-dasharray="0.2 6" stroke-linecap="round" />
+
+    <!-- simplified emblem (placeholder for the painted icon of the Archangel — see README) -->
+    <g stroke="#AB8324" stroke-width="7" stroke-linecap="round">
+      <line x1="0" y1="-30" x2="0" y2="30" />
+      <line x1="-22" y1="-6" x2="22" y2="-6" />
+    </g>
+    <g fill="#AB8324" stroke="none">
+      <circle cx="0" cy="-30" r="6" />
+      <circle cx="0" cy="30" r="6" />
+      <circle cx="-22" cy="-6" r="6" />
+      <circle cx="22" cy="-6" r="6" />
+    </g>
+
+    <!-- petal labels -->
+    <g font-family="Cairo, Tahoma, Arial, sans-serif" font-weight="700" fill="#8C6D1F" text-anchor="middle">
+      <text x="0" y="-78" font-size="18">كنيسة</text>
+      <text x="0" y="103" font-size="18">بدمنهور</text>
+      <g transform="rotate(-90) translate(0,-80)">
+        <text font-size="15" transform="rotate(90)">
+          <tspan x="0" dy="-8">الجليل</tspan>
+          <tspan x="0" dy="20">ميخائيل</tspan>
+        </text>
+      </g>
+      <g transform="rotate(90) translate(0,-80)">
+        <text font-size="15" transform="rotate(-90)">
+          <tspan x="0" dy="-8">رئيس</tspan>
+          <tspan x="0" dy="20">الملائكة</tspan>
+        </text>
+      </g>
+    </g>
+  </g>
+</svg>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { CopticCross } from "@/components/layout/CopticCross";
+import { ChurchLogo } from "@/components/layout/ChurchLogo";
+import { EparchyLogo } from "@/components/layout/EparchyLogo";
 import { LoginForm } from "./LoginForm";
 
 export const metadata: Metadata = { title: "تسجيل الدخول" };
@@ -9,8 +10,8 @@ export default function LoginPage() {
     <div className="flex min-h-dvh items-center justify-center bg-bg-alt coptic-pattern px-4 py-10">
       <div className="w-full max-w-md animate-fade-in-up">
         <div className="mb-7 flex flex-col items-center text-center">
-          <div className="mb-4 flex size-16 items-center justify-center rounded-[var(--radius-lg)] bg-surface text-primary shadow-[var(--shadow-md)]">
-            <CopticCross className="size-9" />
+          <div className="mb-4 flex size-20 items-center justify-center rounded-[var(--radius-lg)] bg-surface shadow-[var(--shadow-md)]">
+            <ChurchLogo className="size-16" />
           </div>
           <h1 className="text-xl font-extrabold text-ink">خدمة التربية الكنسية</h1>
           <p className="mt-1 text-sm text-ink-muted">كنيسة رئيس الملائكة الجليل ميخائيل بدمنهور</p>
@@ -25,6 +26,10 @@ export default function LoginPage() {
         <p className="mt-6 text-center text-xs text-ink-faint">
           &ldquo;ليس لي فرح أعظم من هذا: أن أسمع عن أولادي أنهم يسلكون بالحق&rdquo; (3يو 1: 4)
         </p>
+
+        <div className="mt-4 flex justify-center">
+          <EparchyLogo className="h-14 w-auto opacity-80" />
+        </div>
       </div>
     </div>
   );

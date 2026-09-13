@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Role } from "@prisma/client";
 import { NAV_ITEMS } from "./nav-items";
-import { CopticCross } from "./CopticCross";
+import { ChurchLogo } from "./ChurchLogo";
 import { cn } from "@/lib/utils";
 
 export function Sidebar({ role }: { role: Role }) {
@@ -13,7 +13,7 @@ export function Sidebar({ role }: { role: Role }) {
   return (
     <aside className="hidden lg:flex w-64 shrink-0 flex-col border-l border-border bg-surface">
       <div className="flex items-center gap-2.5 px-5 py-5 border-b border-border">
-        <CopticCross className="size-8 text-primary" />
+        <ChurchLogo className="size-11 shrink-0" />
         <div className="min-w-0">
           <p className="truncate text-sm font-extrabold text-ink leading-tight">خدمة التربية الكنسية</p>
           <p className="truncate text-xs text-ink-faint leading-tight">كنيسة الملاك ميخائيل بدمنهور</p>
