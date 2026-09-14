@@ -52,7 +52,16 @@ if (!direct) {
 
 const viaPooler = direct !== process.env.DATABASE_URL;
 console.log(`→ تطبيق الترحيلات عبر الاتصال ${viaPooler ? "المباشر" : "الحالي"}...`);
-run("npx prisma migrate deploy", { DATABASE_URL: direct });
+
+// قفل Prisma للترحيلات (pg_advisory_lock) قفلٌ على مستوى الجلسة، ومهلته
+// عشر ثوانٍ غير قابلة للضبط. مع Neon قد يتسرّب القفل فيظل خادم خلفي في
+// الـpooler ماسكًا له بعد انتهاء مهلة العميل، فتفشل كل محاولة تالية.
+// وظيفة القفل منع تزامن عمليتي ترحيل، وهو تزامن لا يحدث هنا: Vercel ينفّذ
+// بناءً واحدًا في المرة. لذلك نعطّله (المخرج الرسمي الموثّق من Prisma).
+run("npx prisma migrate deploy", {
+  DATABASE_URL: direct,
+  PRISMA_SCHEMA_DISABLE_ADVISORY_LOCK: "1",
+});
 
 console.log("→ التهيئة الأولية (تعمل مرة واحدة على قاعدة بيانات فارغة)...");
 run("npx prisma db seed", { DATABASE_URL: direct });
