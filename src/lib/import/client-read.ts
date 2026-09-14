@@ -13,7 +13,17 @@
  * دقّة القراءة الضوئية للعربية ليست مضمونة — لذلك تمر النتيجة دائمًا على
  * جدول المراجعة قبل الحفظ، ولا يُحفظ من ورائه سطر.
  */
-import { itemsToTable, linesToTable, type LayoutItem } from "./layout";
+import { itemsToTable, linesToTable, type LayoutItem, type TableOptions } from "./layout";
+import { matchColumn } from "./normalize";
+
+/**
+ * يستعين بناءُ الجدول بمعرفة الأعمدة: صفُّ العناوين يحدّد مواضع الأعمدة،
+ * وعمود الاسم يكون مرساةً لدمج سطور المخدوم الواحد.
+ */
+const TABLE_OPTIONS: TableOptions = {
+  isHeaderCell: (text) => matchColumn(text) !== null,
+  isAnchorHeader: (text) => matchColumn(text) === "fullName",
+};
 
 export type OcrProgress = { message: string; ratio: number };
 
@@ -42,9 +52,10 @@ const PDF_TEXT_THRESHOLD = 40;
  */
 export async function readFileInBrowser(
   file: File,
-  onProgress: (progress: OcrProgress) => void
+  onProgress: (progress: OcrProgress) => void,
+  options: { forceOcr?: boolean } = {}
 ): Promise<{ table: string[][]; source: string; usedOcr: boolean }> {
-  if (isPdfFile(file)) {
+  if (isPdfFile(file) && !options.forceOcr) {
     onProgress({ message: "فحص الملف…", ratio: 0.02 });
     const fromText = await readPdfTextLayer(file);
     if (fromText) return { ...fromText, usedOcr: false };
@@ -84,7 +95,7 @@ async function readPdfTextLayer(
         items.push({ text: raw.str, x, y: viewport.height - y - height, width: raw.width, height });
       }
 
-      for (const row of itemsToTable(items)) table.push(row);
+      for (const row of itemsToTable(items, TABLE_OPTIONS)) table.push(row);
       page.cleanup();
     }
   } finally {
@@ -182,7 +193,7 @@ async function readScannedFile(
 
   onProgress({ message: "ترتيب البيانات…", ratio: 0.97 });
 
-  const table = itemsToTable(items);
+  const table = itemsToTable(items, TABLE_OPTIONS);
   // لو لم يتكوّن جدول ذو أعمدة، فالكشف على الأرجح قائمة أسطر.
   if (table.length > 1 && table[0].length >= 3) {
     return { table, source: `قراءة ضوئية — ${canvases.length} صفحة` };

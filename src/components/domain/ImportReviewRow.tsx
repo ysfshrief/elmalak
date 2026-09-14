@@ -8,6 +8,13 @@ import { cn } from "@/lib/utils";
 import { PHONE_LABELS, PHONE_SLOTS } from "@/lib/import/columns";
 import type { ImportRow, GradeOption } from "@/lib/import/normalize";
 
+/** القائمة المعتادة، مع إضافة ما قُرئ من الملف إن كان خارجها («الخال»). */
+function labelOptions(current?: string) {
+  const options: string[] = [...PHONE_LABELS];
+  if (current && !options.includes(current)) options.unshift(current);
+  return options;
+}
+
 export function ImportReviewRow({
   row,
   index,
@@ -32,10 +39,12 @@ export function ImportReviewRow({
     onChange({ ...row, [key]: value });
 
   // خانات التليفون ثابتة أثناء المراجعة حتى لا يقفز ما يكتبه المستخدم من
-  // خانة إلى أخرى. تُضغط الخانات الفارغة عند الحفظ لا قبله.
+  // خانة إلى أخرى، ولا تقلّ عمّا قُرئ فعلًا حتى لا يختفي رقم عن العين.
+  // تُضغط الخانات الفارغة عند الحفظ لا قبله.
+  const slotCount = Math.max(PHONE_SLOTS, row.phones.length);
   const setPhone = (slot: number, patch: { label?: string; number?: string }) => {
     const phones = Array.from(
-      { length: PHONE_SLOTS },
+      { length: slotCount },
       (_, i) => row.phones[i] ?? { label: i === 0 ? PHONE_LABELS[0] : "أخرى", number: "" }
     );
     phones[slot] = { ...phones[slot], ...patch };
@@ -204,7 +213,7 @@ export function ImportReviewRow({
             />
           </div>
 
-          {Array.from({ length: PHONE_SLOTS }, (_, slot) => {
+          {Array.from({ length: slotCount }, (_, slot) => {
             const phone = row.phones[slot];
             const defaultLabel = slot === 0 ? PHONE_LABELS[0] : "أخرى";
             return (
@@ -225,7 +234,7 @@ export function ImportReviewRow({
                     value={phone?.label ?? defaultLabel}
                     onChange={(e) => setPhone(slot, { label: e.target.value })}
                   >
-                    {PHONE_LABELS.map((l) => (
+                    {labelOptions(phone?.label).map((l) => (
                       <option key={l} value={l}>
                         {l}
                       </option>

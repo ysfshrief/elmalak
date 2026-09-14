@@ -33,6 +33,11 @@ export function normalizeArabic(input: string) {
   return toLatinDigits(String(input ?? ""))
     .replace(/[ً-ٰٟـ]/g, "")
     .replace(/[إأآٱ]/g, "ا")
+    // بعض مولّدات PDF تكتب رابطة «لام ألف» بحرفيها مقلوبين، فيخرج «الاسم»
+    // من الملف «االسم». القلب لا يُردّ في النص (فـ«المالك» قد تكون «الملاك»
+    // وقد تكون على حالها)، لكن توحيد الترتيب هنا يكفي ليتطابق العنوان
+    // المقلوب مع نظيره السليم عند البحث والمقارنة.
+    .replace(/لا/g, "ال")
     .replace(/ى/g, "ي")
     .replace(/ؤ/g, "و")
     .replace(/ئ/g, "ي")
@@ -63,12 +68,13 @@ for (const col of COLUMNS) {
     HEADER_INDEX.set(normalizeArabic(label), col.key);
   }
 }
-// تسميات شائعة إضافية لا تستحق عمودًا في القالب.
-for (const [label, key] of [
-  ["م", null],
-  ["مسلسل", null],
-] as const) {
-  if (key === null) HEADER_INDEX.set(normalizeArabic(label), "__skip" as ColumnKey);
+/** أعمدة معروفة لا يحتاجها النظام (الترقيم المسلسل) — تُهمَل بلا تنبيه. */
+const IGNORABLE_HEADERS = new Set(
+  ["م", "مسلسل", "رقم", "م.", "ت", "#"].map(normalizeArabic)
+);
+
+export function isIgnorableHeader(header: string) {
+  return IGNORABLE_HEADERS.has(normalizeArabic(header));
 }
 
 /**
@@ -83,8 +89,7 @@ export function isSummaryRow(name: string) {
 }
 
 export function matchColumn(header: string): ColumnKey | null {
-  const key = HEADER_INDEX.get(normalizeArabic(header));
-  return key && key !== ("__skip" as ColumnKey) ? key : null;
+  return HEADER_INDEX.get(normalizeArabic(header)) ?? null;
 }
 
 /** أفضل صف عناوين في الجدول: الصف الذي يطابق أكبر عدد من الأعمدة المعروفة. */
@@ -162,6 +167,79 @@ export function parseGenderValue(value: unknown): "MALE" | "FEMALE" | "" {
   if (MALE_WORDS.has(key)) return "MALE";
   if (FEMALE_WORDS.has(key)) return "FEMALE";
   return "";
+}
+
+/** أسماء أصحاب الأرقام كما تُكتب في الكشوف، وما تؤول إليه في النظام. */
+const PHONE_LABEL_ALIASES: [string[], string][] = [
+  [["الاب", "اب", "والد", "الوالد"], "الأب"],
+  [["الام", "ام", "والده", "الوالده"], "الأم"],
+  [["البيت", "المنزل", "ارضي", "الارضي", "منزل"], "المنزل"],
+  [["المخدوم", "مخدوم", "الطفل", "الابن", "الابنه", "البنت"], "المخدوم"],
+  [["الاخ", "اخ", "الاخت", "اخت"], "الأخ"],
+  [["الجد", "جد", "الجده", "جده"], "الجد"],
+  [["العم", "عم", "الخال", "خال", "العمه", "الخاله"], "قريب"],
+];
+
+/**
+ * يستخرج كل الأرقام من نص واحد مع صاحب كلٍّ منها.
+ *
+ * خانة التليفون في الكشوف ليست رقمًا مفردًا، بل عمودًا يتراصّ فيه «الأب:»
+ * و«الأم:» و«البيت:»؛ وحين تُدمج سطور المخدوم في سجل واحد تجتمع كلها في نصّ
+ * واحد. فيُقرأ كل رقم ويُنسب إلى الاسم الذي يسبقه.
+ */
+export function extractPhones(
+  text: string,
+  fallbackLabel: string
+): { phones: ImportPhone[]; errors: string[] } {
+  const raw = toLatinDigits(cleanCell(text));
+  const phones: ImportPhone[] = [];
+  const errors: string[] = [];
+  if (!raw) return { phones, errors };
+
+  const matches = [...raw.matchAll(/\+?\d[\d\s-]{5,18}\d|\d{5,}/g)];
+  if (matches.length === 0) {
+    // نصٌّ بلا أرقام أصلًا («المخدوم:» وحدها) ليس خطأً بل خانة فارغة.
+    if (/\d/.test(raw)) errors.push(`رقم غير مفهوم: «${raw}»`);
+    return { phones, errors };
+  }
+
+  let cursor = 0;
+  for (const match of matches) {
+    const before = raw.slice(cursor, match.index);
+    cursor = (match.index ?? 0) + match[0].length;
+
+    const parsed = parsePhoneValue(match[0]);
+    if (!parsed.number) {
+      if (parsed.error) errors.push(parsed.error);
+      continue;
+    }
+    phones.push({ label: labelFromContext(before) ?? fallbackLabel, number: parsed.number });
+  }
+  return { phones, errors };
+}
+
+/**
+ * صاحب الرقم هو أقرب اسم يسبقه، لا أول اسم في النص: «الأب: الأم: ٠١٢…»
+ * رقمٌ للأم وقد تُرك مكان رقم الأب فارغًا. ولذلك يُقرأ ما قبل الرقم من آخره.
+ */
+function labelFromContext(text: string) {
+  const words = cleanCell(text)
+    .split(/[\s:،,.-]+/)
+    .filter(Boolean);
+
+  for (let i = words.length - 1; i >= 0; i--) {
+    const key = normalizeArabic(words[i]);
+    if (!key) continue;
+    for (const [aliases, label] of PHONE_LABEL_ALIASES) {
+      if (aliases.some((alias) => normalizeArabic(alias) === key)) return label;
+    }
+  }
+
+  // اسمٌ غير معروف («الخال» مثلًا) يُؤخذ كما كُتب بدل أن يُنسب الرقم خطأً.
+  const last = words[words.length - 1];
+  if (last && /\p{Script=Arabic}/u.test(last) && last.length <= 20) return last;
+
+  return null;
 }
 
 /** يستخلص رقمًا صالحًا أو يعيد خطأً — لا يُخمّن ولا يُصلح. */
@@ -243,10 +321,16 @@ export function resolveGrade(
 export function tableToRows(
   table: string[][],
   options: { defaultGradeId: string; grades: GradeOption[] }
-): { rows: ImportRow[]; headerRow: number; mapped: ColumnKey[]; ignoredHeaders: string[] } {
+): {
+  rows: ImportRow[];
+  headerRow: number;
+  mapped: ColumnKey[];
+  ignoredHeaders: string[];
+  notices: string[];
+} {
   const { index: headerRow, matched } = findHeaderRow(table);
   if (headerRow < 0 || matched === 0) {
-    return { rows: [], headerRow: -1, mapped: [], ignoredHeaders: [] };
+    return { rows: [], headerRow: -1, mapped: [], ignoredHeaders: [], notices: [] };
   }
 
   const headers = table[headerRow];
@@ -257,7 +341,8 @@ export function tableToRows(
   headers.forEach((header, i) => {
     const key = matchColumn(header);
     if (!key) {
-      if (cleanCell(header)) ignoredHeaders.push(cleanCell(header));
+      const text = cleanCell(header);
+      if (text && !isIgnorableHeader(text)) ignoredHeaders.push(text);
       return;
     }
     // عمود مكرّر؟ وجّهه إلى أول خانة تليفون فارغة بدل إسقاطه.
@@ -290,10 +375,12 @@ export function tableToRows(
 
     const fullName = get("fullName");
     // الصفوف الفارغة، وشظايا القراءة الضوئية، وسطور التذييل («الإجمالي: ٢٠»)
-    // ليست مخدومين.
+    // ليست مخدومين. وكذلك صف العناوين نفسه، فهو يتكرّر في أعلى كل صفحة.
     if (!fullName) continue;
     if ((fullName.match(/\p{L}/gu)?.length ?? 0) < 3) continue;
     if (isSummaryRow(fullName)) continue;
+    if (matchColumn(fullName)) continue;
+    if (!looksLikeName(fullName)) continue;
 
     const warnings: string[] = [];
 
@@ -310,11 +397,12 @@ export function tableToRows(
 
     const phones: ImportPhone[] = [];
     PHONE_COLUMNS.forEach((slot, i) => {
-      const parsed = parsePhoneValue(get(slot.number));
-      if (parsed.error) warnings.push(parsed.error);
-      if (!parsed.number) return;
-      const fallback = i === 0 ? "الأب" : "أخرى";
-      phones.push({ label: parsePhoneLabel(get(slot.label), fallback), number: parsed.number });
+      const numberText = get(slot.number);
+      if (!numberText) return;
+      const fallback = parsePhoneLabel(get(slot.label), i === 0 ? "الأب" : "أخرى");
+      const found = extractPhones(numberText, fallback);
+      warnings.push(...found.errors);
+      phones.push(...found.phones);
     });
 
     const genderText = get("gender");
@@ -337,5 +425,113 @@ export function tableToRows(
     });
   }
 
-  return { rows, headerRow, mapped: [...used], ignoredHeaders };
+  const notices: string[] = [];
+  if (hasSwappedLamAlef(table)) {
+    notices.push(
+      "هذا الملف يكتب رابطة «لا» بحرفيها مقلوبين (فيخرج «الاسم» هكذا: «االسم»). " +
+        "صُحِّحت العناوين تلقائيًا، لكن الأسماء المعلَّمة بتحذير تحتاج مراجعتك — " +
+        "وكذلك أسماء المدارس وآباء الاعتراف."
+    );
+    for (const row of rows) {
+      if (looksLamAlefSwapped(row.fullName)) row.warnings.push("راجع كتابة «لا» في الاسم");
+    }
+  }
+
+  return { rows: mergeRepeatedChildren(rows), headerRow, mapped: [...used], ignoredHeaders, notices };
+}
+
+/**
+ * يكشف الملفات التي كُتبت فيها رابطة «لام ألف» مقلوبة.
+ *
+ * نصٌّ عربي طويل لا يخلو من «لا» أبدًا؛ فخلوّه منها تمامًا مع وفرة الحروف
+ * دليلٌ قاطع على القلب. ولا يمكن ردّه آليًا: «المالك» قد تكون «الملاك» وقد
+ * تكون على حالها، فالأسلم أن يُنبَّه صاحب الكشف ليراجع.
+ */
+function hasSwappedLamAlef(table: string[][]): boolean {
+  const text = table.flat().join(" ");
+  const arabicLetters = text.match(/\p{Script=Arabic}/gu)?.length ?? 0;
+  if (arabicLetters < 400) return false;
+  return !text.includes("لا");
+}
+
+/** أسماء الشهور كما تُكتب في جداول الافتقاد وأعياد الميلاد. */
+const MONTH_NAMES = new Set(
+  [
+    "يناير", "فبراير", "مارس", "ابريل", "مايو", "يونيو", "يونية",
+    "يوليو", "يولية", "اغسطس", "سبتمبر", "اكتوبر", "نوفمبر", "ديسمبر",
+    "كانون الثاني", "شباط", "اذار", "نيسان", "ايار", "حزيران",
+    "تموز", "اب", "ايلول", "تشرين الاول", "تشرين الثاني", "كانون الاول",
+    "توت", "بابه", "هاتور", "كيهك", "طوبه", "امشير", "برمهات",
+    "برموده", "بشنس", "بؤونه", "ابيب", "مسرى", "نسيء",
+  ].map(normalizeArabic)
+);
+
+/**
+ * هل يصلح النص اسم مخدوم؟
+ *
+ * صفحات الحضور والافتقاد تتصدّرها آيات وتُعنون أعمدتها بأسماء الشهور، وكلاهما
+ * يقع في عمود الاسم حين تُقرأ الصفحة. والاسم المصري لا يتجاوز ستّ كلمات ولا
+ * يحمل أقواسًا ولا علامات اقتباس ولا أرقامًا.
+ */
+function looksLikeName(text: string) {
+  if (text.length > 70) return false;
+  if (text.split(/\s+/).length > 6) return false;
+  if (/[()«»"'\[\]:;\d]/.test(text)) return false;
+  if (MONTH_NAMES.has(normalizeArabic(text))) return false;
+  return true;
+}
+
+/** كلمة فيها «ال» في غير أولها — موضع الشك في الاسم المقلوب. */
+export function looksLamAlefSwapped(name: string) {
+  return name.split(/\s+/).some((word) => word.indexOf("ال") > 0);
+}
+
+/**
+ * يدمج تكرار المخدوم الواحد داخل الملف.
+ *
+ * الكشف الواحد يجمع عادةً صفحة البيانات وصفحات الحضور والافتقاد، فيتكرّر
+ * الاسم في كل صفحة ولا تحمل بياناته الكاملة إلا صفحة واحدة. فتُجمع المواضع
+ * في سجل واحد بدل أن تُعرض عشرات الصفوف الفارغة.
+ */
+function mergeRepeatedChildren(rows: ImportRow[]): ImportRow[] {
+  const byKey = new Map<string, ImportRow>();
+  const SCALARS = [
+    ["birthDate", "تاريخ الميلاد"],
+    ["school", "المدرسة"],
+    ["confessionFather", "أب الاعتراف"],
+    ["address", "العنوان"],
+    ["gender", "النوع"],
+    ["notes", "ملاحظات"],
+  ] as const;
+
+  for (const row of rows) {
+    const key = `${row.gradeId}:${normalizeArabic(row.fullName)}`;
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, row);
+      continue;
+    }
+
+    for (const [field, label] of SCALARS) {
+      const incoming = row[field];
+      if (!incoming) continue;
+      const current = existing[field];
+      if (!current) {
+        // الحقول المدموجة كلها نصّية، والقيمة الواردة من الحقل نفسه.
+        (existing[field] as string) = incoming;
+      } else if (current !== incoming) {
+        // قيمتان مختلفتان للاسم نفسه: إمّا خطأ قراءة أو مخدومان بالاسم ذاته.
+        existing.warnings.push(`«${label}» مذكور بقيمتين: «${current}» و«${incoming}»`);
+      }
+    }
+
+    for (const phone of row.phones) {
+      if (!existing.phones.some((p) => p.number === phone.number)) existing.phones.push(phone);
+    }
+    for (const warning of row.warnings) {
+      if (!existing.warnings.includes(warning)) existing.warnings.push(warning);
+    }
+  }
+
+  return [...byKey.values()];
 }

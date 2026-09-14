@@ -12,7 +12,14 @@ import { MAX_IMPORT_ROWS } from "@/lib/import/columns";
 import type { Gender } from "@prisma/client";
 
 export type ParseActionResult =
-  | { status: "ok"; rows: ImportRow[]; source: string; ignoredHeaders: string[]; truncated: boolean }
+  | {
+      status: "ok";
+      rows: ImportRow[];
+      source: string;
+      ignoredHeaders: string[];
+      truncated: boolean;
+      notices: string[];
+    }
   | { status: "error"; message: string };
 
 /**
@@ -74,7 +81,10 @@ async function buildRows(
   user: ActionUser
 ): Promise<ParseActionResult> {
   const grades = await getScopedGradeOptions(user);
-  const { rows, headerRow, ignoredHeaders } = tableToRows(table, { defaultGradeId, grades });
+  const { rows, headerRow, ignoredHeaders, notices } = tableToRows(table, {
+    defaultGradeId,
+    grades,
+  });
 
   if (headerRow < 0) {
     return {
@@ -93,7 +103,7 @@ async function buildRows(
   // تنبيه مبكّر بالتكرار: داخل الملف نفسه، وفي قاعدة البيانات.
   await markDuplicates(kept);
 
-  return { status: "ok", rows: kept, source, ignoredHeaders, truncated };
+  return { status: "ok", rows: kept, source, ignoredHeaders, truncated, notices };
 }
 
 /** يضيف تحذيرًا للصفوف المكرّرة — داخل الملف وفي الصف نفسه هذا العام. */

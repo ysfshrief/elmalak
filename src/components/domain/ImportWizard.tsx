@@ -125,6 +125,7 @@ export function ImportWizard({
       if (result.ignoredHeaders.length > 0) {
         messages.push(`أعمدة لم تُفهم فأُهملت: ${result.ignoredHeaders.join("، ")}`);
       }
+      messages.push(...result.notices);
       setNotices(messages);
       setStage({ name: "review" });
     } catch (error) {
@@ -144,16 +145,27 @@ export function ImportWizard({
    * ملفات PDF والصور تُقرأ على جهاز المستخدم: لا تُرفع فلا تصطدم بحدود
    * الحجم، ولا تغادر صورة الكشف جهازه. ثم يُرسَل النص وحده ليُفهم ويُتحقق منه.
    */
-  async function readInBrowser(file: File) {
+  async function readInBrowser(file: File, forceOcr = false) {
     const { readFileInBrowser } = await import("@/lib/import/client-read");
-    const { table, source: readSource, usedOcr } = await readFileInBrowser(file, (p) =>
-      setStage({ name: "reading", message: p.message, ratio: p.ratio })
-    );
+    const progress = (p: { message: string; ratio: number }) =>
+      setStage({ name: "reading", message: p.message, ratio: p.ratio });
+
+    const { table, source: readSource, usedOcr } = await readFileInBrowser(file, progress, {
+      forceOcr,
+    });
     if (usedOcr) {
       toast.info("قُرئ الملف ضوئيًا — راجع كل سطر قبل الحفظ", { duration: 6000 });
     }
     setStage({ name: "reading", message: "مطابقة الأعمدة…", ratio: 0.99 });
-    return buildRowsFromTableAction(table, gradeId, readSource);
+    const result = await buildRowsFromTableAction(table, gradeId, readSource);
+
+    // ملف PDF قد يحمل طبقة نص مشوّهة أو بلا جدول؛ عندها تبقى الصورة
+    // المرسومة صحيحة، فتُعاد القراءة ضوئيًا بدل أن تنتهي المحاولة بخطأ.
+    if (result.status === "error" && !usedOcr && !forceOcr) {
+      toast.info("نص الملف غير مقروء — جارٍ قراءته ضوئيًا", { duration: 5000 });
+      return readInBrowser(file, true);
+    }
+    return result;
   }
 
   async function save() {
