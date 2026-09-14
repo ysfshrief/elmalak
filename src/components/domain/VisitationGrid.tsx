@@ -8,20 +8,18 @@ import { Textarea } from "@/components/ui/Input";
 import { cn } from "@/lib/utils";
 import { setVisitationAction } from "@/actions/visitation";
 
-type Member = { id: string; fullName: string };
+type Row = { enrollmentId: string; fullName: string };
 type Entry = { visited: boolean; note: string };
 
 export function VisitationGrid({
-  familyId,
   year,
   month,
-  members,
+  rows,
   initialEntries,
 }: {
-  familyId: string;
   year: number;
   month: number;
-  members: Member[];
+  rows: Row[];
   initialEntries: Record<string, Entry>;
 }) {
   // The parent page mounts this component with `key={`${year}-${month}`}`,
@@ -32,11 +30,10 @@ export function VisitationGrid({
 
   const visitedCount = Object.values(entries).filter((e) => e.visited).length;
 
-  async function persist(memberId: string, next: Entry) {
+  async function persist(enrollmentId: string, next: Entry) {
     try {
       await setVisitationAction({
-        memberId,
-        familyId,
+        enrollmentId,
         year,
         month,
         visited: next.visited,
@@ -47,20 +44,20 @@ export function VisitationGrid({
     }
   }
 
-  function toggleVisited(memberId: string) {
-    const current = entries[memberId] ?? { visited: false, note: "" };
+  function toggleVisited(enrollmentId: string) {
+    const current = entries[enrollmentId] ?? { visited: false, note: "" };
     const next = { ...current, visited: !current.visited };
-    setEntries((s) => ({ ...s, [memberId]: next }));
-    persist(memberId, next);
+    setEntries((s) => ({ ...s, [enrollmentId]: next }));
+    persist(enrollmentId, next);
   }
 
-  function updateNote(memberId: string, note: string) {
-    setEntries((s) => ({ ...s, [memberId]: { ...(s[memberId] ?? { visited: false, note: "" }), note } }));
+  function updateNote(enrollmentId: string, note: string) {
+    setEntries((s) => ({ ...s, [enrollmentId]: { ...(s[enrollmentId] ?? { visited: false, note: "" }), note } }));
   }
 
-  function saveNote(memberId: string) {
-    const current = entries[memberId] ?? { visited: false, note: "" };
-    persist(memberId, current);
+  function saveNote(enrollmentId: string) {
+    const current = entries[enrollmentId] ?? { visited: false, note: "" };
+    persist(enrollmentId, current);
   }
 
   return (
@@ -68,23 +65,23 @@ export function VisitationGrid({
       <div className="flex items-center justify-between rounded-[var(--radius-md)] bg-bg-alt px-4 py-2.5 text-sm">
         <span className="flex items-center gap-1.5 font-semibold text-ink">
           <HeartHandshake className="size-4 text-info" />
-          تم افتقاد: <span className="tabular-nums text-info">{visitedCount}</span> / {members.length}
+          تم افتقاد: <span className="tabular-nums text-info">{visitedCount}</span> / {rows.length}
         </span>
       </div>
 
       <ul className="space-y-2">
-        {members.map((m) => {
-          const entry = entries[m.id] ?? { visited: false, note: "" };
-          const noteOpen = openNoteFor === m.id;
+        {rows.map((m) => {
+          const entry = entries[m.enrollmentId] ?? { visited: false, note: "" };
+          const noteOpen = openNoteFor === m.enrollmentId;
           return (
-            <li key={m.id} className="rounded-[var(--radius-lg)] border border-border bg-surface p-3">
+            <li key={m.enrollmentId} className="rounded-[var(--radius-lg)] border border-border bg-surface p-3">
               <div className="flex items-center gap-3">
                 <Avatar name={m.fullName} size="sm" />
                 <span className="flex-1 truncate font-semibold text-ink">{m.fullName}</span>
 
                 <button
                   type="button"
-                  onClick={() => setOpenNoteFor(noteOpen ? null : m.id)}
+                  onClick={() => setOpenNoteFor(noteOpen ? null : m.enrollmentId)}
                   aria-label="إضافة ملاحظة"
                   className={cn(
                     "flex size-9 items-center justify-center rounded-full transition-colors",
@@ -96,7 +93,7 @@ export function VisitationGrid({
 
                 <button
                   type="button"
-                  onClick={() => toggleVisited(m.id)}
+                  onClick={() => toggleVisited(m.enrollmentId)}
                   aria-pressed={entry.visited}
                   className={cn(
                     "flex h-9 items-center gap-1.5 rounded-full px-3.5 text-sm font-bold transition-all active:scale-95",
@@ -113,8 +110,8 @@ export function VisitationGrid({
                   <Textarea
                     rows={2}
                     value={entry.note}
-                    onChange={(e) => updateNote(m.id, e.target.value)}
-                    onBlur={() => saveNote(m.id)}
+                    onChange={(e) => updateNote(m.enrollmentId, e.target.value)}
+                    onBlur={() => saveNote(m.enrollmentId)}
                     placeholder="اكتب ملاحظة عن الافتقاد..."
                     className="text-sm"
                   />

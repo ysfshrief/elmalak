@@ -4,35 +4,89 @@ import * as React from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
+import { Plus, Trash2 } from "lucide-react";
 import { z } from "zod";
 import { userSchema } from "@/lib/validation";
 import { Input, Select, Label, FieldError, FieldHint } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { ROLE_LABELS } from "@/lib/roles";
+import { ROLE_OPTIONS } from "@/lib/roles";
 import { createUserAction, updateUserAction } from "@/actions/users";
 import type { Role } from "@prisma/client";
 
 type FormValues = z.infer<typeof userSchema>;
 
+export type ScopeTree = {
+  service: { id: string; name: string } | null;
+  stages: {
+    id: string;
+    name: string;
+    divisions: { id: string; name: string; grades: { id: string; name: string; familyName: string | null }[] }[];
+  }[];
+};
+
+/** كل خيار = مستوى واحد في الهيكل، مُرمَّز كـ"level:id". */
+function buildScopeOptions(tree: ScopeTree) {
+  const options: { value: string; label: string }[] = [];
+  if (tree.service) {
+    options.push({ value: `service:${tree.service.id}`, label: `الخدمة كلها — ${tree.service.name}` });
+  }
+  for (const stage of tree.stages) {
+    options.push({ value: `stage:${stage.id}`, label: `مرحلة ${stage.name} (كاملة)` });
+    for (const division of stage.divisions) {
+      options.push({ value: `division:${division.id}`, label: `${stage.name} › ${division.name}` });
+      for (const grade of division.grades) {
+        options.push({
+          value: `grade:${grade.id}`,
+          label: `${stage.name} › ${division.name} › ${grade.name}${grade.familyName ? ` (${grade.familyName})` : ""}`,
+        });
+      }
+    }
+  }
+  return options;
+}
+
+function encodeAssignment(a: FormValues["assignments"][number]) {
+  if (a.serviceId) return `service:${a.serviceId}`;
+  if (a.stageId) return `stage:${a.stageId}`;
+  if (a.divisionId) return `division:${a.divisionId}`;
+  if (a.gradeId) return `grade:${a.gradeId}`;
+  return "";
+}
+
+function decodeAssignment(value: string): FormValues["assignments"][number] {
+  const [level, id] = value.split(":");
+  return {
+    serviceId: level === "service" ? id : "",
+    stageId: level === "stage" ? id : "",
+    divisionId: level === "division" ? id : "",
+    gradeId: level === "grade" ? id : "",
+  };
+}
+
 export function UserForm({
-  stages,
-  families,
+  tree,
   user,
   onSuccess,
 }: {
-  stages: { id: string; name: string }[];
-  families: { id: string; name: string }[];
+  tree: ScopeTree;
   user?: {
     id: string;
     name: string;
     username: string;
     phone: string | null;
     role: Role;
-    stageId: string | null;
-    assignments: { familyId: string }[];
+    gender: string | null;
+    assignments: {
+      serviceId: string | null;
+      stageId: string | null;
+      divisionId: string | null;
+      gradeId: string | null;
+    }[];
   };
   onSuccess: () => void;
 }) {
+  const scopeOptions = React.useMemo(() => buildScopeOptions(tree), [tree]);
+
   const {
     register,
     control,
@@ -45,9 +99,15 @@ export function UserForm({
       name: user?.name ?? "",
       username: user?.username ?? "",
       phone: user?.phone ?? "",
-      role: user?.role ?? "FAMILY_SERVANT",
-      stageId: user?.stageId ?? "",
-      familyIds: user?.assignments.map((a) => a.familyId) ?? [],
+      role: user?.role ?? "SERVANT",
+      gender: (user?.gender ?? "") as FormValues["gender"],
+      assignments:
+        user?.assignments.map((a) => ({
+          serviceId: a.serviceId ?? "",
+          stageId: a.stageId ?? "",
+          divisionId: a.divisionId ?? "",
+          gradeId: a.gradeId ?? "",
+        })) ?? [],
       password: "",
     },
   });
@@ -88,67 +148,97 @@ export function UserForm({
         </div>
       </div>
 
-      <div>
-        <Label htmlFor="phone">رقم التليفون</Label>
-        <Input id="phone" {...register("phone")} inputMode="tel" />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <Label htmlFor="phone">رقم التليفون</Label>
+          <Input id="phone" {...register("phone")} inputMode="tel" />
+        </div>
+        <div>
+          <Label htmlFor="gender">النوع</Label>
+          <Select id="gender" {...register("gender")}>
+            <option value="">غير محدد</option>
+            <option value="MALE">ذكر</option>
+            <option value="FEMALE">أنثى</option>
+          </Select>
+          <FieldHint>يحدد صياغة المسمّى: خادم/خادمة، أمين/أمينة</FieldHint>
+        </div>
       </div>
 
       <div>
         <Label htmlFor="role" required>
-          الدور
+          الدور — ماذا يستطيع أن يفعل
         </Label>
         <Select id="role" {...register("role")}>
-          {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
-            <option key={r} value={r}>
-              {ROLE_LABELS[r]}
+          {ROLE_OPTIONS.map((r) => (
+            <option key={r.value} value={r.value}>
+              {r.label}
             </option>
           ))}
         </Select>
       </div>
 
-      {role === "STAGE_COORDINATOR" && (
+      {role !== "ADMIN" && (
         <div>
-          <Label htmlFor="stageId" required>
-            المرحلة المسؤول عنها
-          </Label>
-          <Select id="stageId" {...register("stageId")} error={!!errors.stageId}>
-            <option value="">اختر المرحلة</option>
-            {stages.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-      )}
-
-      {role === "FAMILY_SERVANT" && (
-        <div>
-          <Label required>الأسر المسؤول عنها</Label>
+          <Label required>نطاق التكليف — أين يعمل</Label>
           <Controller
             control={control}
-            name="familyIds"
-            render={({ field }) => (
-              <div className="max-h-44 space-y-1.5 overflow-y-auto rounded-[var(--radius-sm)] border border-border-strong p-3">
-                {families.length === 0 && <p className="text-sm text-ink-faint">لا توجد أسر متاحة</p>}
-                {families.map((f) => (
-                  <label key={f.id} className="flex items-center gap-2 text-sm text-ink">
-                    <input
-                      type="checkbox"
-                      checked={field.value.includes(f.id)}
-                      onChange={(e) => {
-                        field.onChange(
-                          e.target.checked ? [...field.value, f.id] : field.value.filter((id) => id !== f.id)
-                        );
-                      }}
-                      className="size-4 accent-primary"
-                    />
-                    {f.name}
-                  </label>
-                ))}
-              </div>
-            )}
+            name="assignments"
+            render={({ field }) => {
+              const values = field.value.map(encodeAssignment);
+              return (
+                <div className="space-y-2">
+                  {values.map((value, index) => (
+                    <div key={index} className="flex items-start gap-2">
+                      <div className="flex-1">
+                        <Select
+                          value={value}
+                          onChange={(e) => {
+                            const next = [...field.value];
+                            next[index] = decodeAssignment(e.target.value);
+                            field.onChange(next);
+                          }}
+                        >
+                          <option value="">اختر النطاق</option>
+                          {scopeOptions.map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label="حذف التكليف"
+                        onClick={() => field.onChange(field.value.filter((_, i) => i !== index))}
+                      >
+                        <Trash2 className="size-4.5 text-error" />
+                      </Button>
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      field.onChange([
+                        ...field.value,
+                        { serviceId: "", stageId: "", divisionId: "", gradeId: "" },
+                      ])
+                    }
+                    className="flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
+                  >
+                    <Plus className="size-4" />
+                    إضافة نطاق
+                  </button>
+                </div>
+              );
+            }}
           />
+          <FieldHint>
+            يمكن إسناد أكثر من نطاق. مثال: «خادم» + نطاق «إعدادي › بنين › الصف الثالث».
+          </FieldHint>
+          <FieldError>{errors.assignments?.message}</FieldError>
         </div>
       )}
 

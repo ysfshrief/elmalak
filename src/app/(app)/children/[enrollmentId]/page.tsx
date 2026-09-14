@@ -3,60 +3,70 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, MapPin, School, Cross, Cake, ClipboardCheck, HeartHandshake } from "lucide-react";
 import { requireUser } from "@/lib/auth";
-import { getMemberDetail, getMemberAttendanceStats, getMemberVisitationHistory } from "@/lib/queries";
+import { getEnrollmentDetail, getChildAttendanceStats, getVisitationHistory } from "@/lib/queries";
+import { canDeleteChild } from "@/lib/roles";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
-import { MemberDetailActions } from "@/components/domain/MemberDetailActions";
+import { ChildDetailActions } from "@/components/domain/ChildDetailActions";
 import { formatArabicDate, formatShortDate, calculateAge, monthName } from "@/lib/utils";
 
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ memberId: string }>;
+  params: Promise<{ enrollmentId: string }>;
 }): Promise<Metadata> {
-  const { memberId } = await params;
+  const { enrollmentId } = await params;
   const user = await requireUser();
-  const member = await getMemberDetail(user, memberId);
-  return { title: member?.fullName ?? "مخدوم" };
+  const enrollment = await getEnrollmentDetail(user, enrollmentId);
+  return { title: enrollment?.child.fullName ?? "مخدوم" };
 }
 
-export default async function MemberDetailPage({ params }: { params: Promise<{ memberId: string }> }) {
-  const { memberId } = await params;
+export default async function ChildPage({ params }: { params: Promise<{ enrollmentId: string }> }) {
+  const { enrollmentId } = await params;
   const user = await requireUser();
-  const member = await getMemberDetail(user, memberId);
-  if (!member) notFound();
+  const enrollment = await getEnrollmentDetail(user, enrollmentId);
+  if (!enrollment) notFound();
 
+  const { child, grade } = enrollment;
   const [attendance, visitation] = await Promise.all([
-    getMemberAttendanceStats(memberId),
-    getMemberVisitationHistory(memberId, 6),
+    getChildAttendanceStats(user, enrollmentId),
+    getVisitationHistory(user, enrollmentId, 6),
   ]);
 
   return (
     <div className="space-y-6">
       <Link
-        href={`/families/${member.familyId}`}
+        href={`/grades/${grade.id}`}
         className="inline-flex items-center gap-1 text-sm font-semibold text-ink-muted hover:text-ink"
       >
         <ChevronLeft className="size-4" />
-        {member.family.name}
+        {grade.familyName ?? grade.name}
       </Link>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between animate-fade-in-up">
         <div className="flex items-center gap-3.5">
-          <Avatar name={member.fullName} size="lg" />
+          <Avatar name={child.fullName} size="lg" />
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-extrabold text-ink sm:text-2xl">{member.fullName}</h1>
-              {!member.isActive && <Badge tone="neutral">غير نشط</Badge>}
+              <h1 className="text-xl font-extrabold text-ink sm:text-2xl">{child.fullName}</h1>
+              {!child.isActive && <Badge tone="neutral">غير نشط</Badge>}
             </div>
-            <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-muted">
-              <Badge tone="primary">{member.family.stage.name}</Badge>
-              {member.birthDate && <span className="tabular-nums">{calculateAge(member.birthDate)} سنة</span>}
-            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-muted">
+              <Badge tone="primary">
+                {grade.division.stage.name} › {grade.division.name} › {grade.name}
+              </Badge>
+              <Badge tone="secondary">{enrollment.academicYear.name}</Badge>
+              {child.birthDate && <span className="tabular-nums">{calculateAge(child.birthDate)} سنة</span>}
+            </div>
           </div>
         </div>
-        <MemberDetailActions member={member} />
+        <ChildDetailActions
+          enrollmentId={enrollment.id}
+          gradeId={grade.id}
+          canDelete={canDeleteChild(user.role)}
+          child={child}
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -65,18 +75,18 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ m
             <CardTitle>البيانات الأساسية</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <InfoRow icon={Cake} label="تاريخ الميلاد" value={formatArabicDate(member.birthDate)} />
-            <InfoRow icon={School} label="المدرسة" value={member.school || "—"} />
-            <InfoRow icon={Cross} label="أب الاعتراف" value={member.confessionFather || "—"} />
-            <InfoRow icon={MapPin} label="العنوان" value={member.address || "—"} />
+            <InfoRow icon={Cake} label="تاريخ الميلاد" value={formatArabicDate(child.birthDate)} />
+            <InfoRow icon={School} label="المدرسة" value={child.school || "—"} />
+            <InfoRow icon={Cross} label="أب الاعتراف" value={child.confessionFather || "—"} />
+            <InfoRow icon={MapPin} label="العنوان" value={child.address || "—"} />
 
             <div>
-              <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink-muted">أرقام التليفونات</p>
-              {member.phones.length === 0 ? (
+              <p className="mb-2 text-sm font-semibold text-ink-muted">أرقام التليفونات</p>
+              {child.phones.length === 0 ? (
                 <p className="text-sm text-ink-faint">لا توجد أرقام مسجلة</p>
               ) : (
                 <ul className="grid gap-2 sm:grid-cols-2">
-                  {member.phones.map((p) => (
+                  {child.phones.map((p) => (
                     <li
                       key={p.id}
                       className="flex items-center justify-between rounded-[var(--radius-sm)] bg-bg-alt px-3 py-2 text-sm"
@@ -91,10 +101,10 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ m
               )}
             </div>
 
-            {member.notes && (
+            {child.notes && (
               <div>
                 <p className="mb-1 text-sm font-semibold text-ink-muted">ملاحظات</p>
-                <p className="text-sm text-ink whitespace-pre-line">{member.notes}</p>
+                <p className="text-sm text-ink whitespace-pre-line">{child.notes}</p>
               </div>
             )}
           </CardContent>
@@ -112,7 +122,9 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ m
               <p className="text-3xl font-extrabold tabular-nums text-ink">
                 {attendance.rate !== null ? `${attendance.rate}%` : "—"}
               </p>
-              <p className="text-sm text-ink-faint">{attendance.present} من {attendance.total} جلسة</p>
+              <p className="text-sm text-ink-faint">
+                {attendance.present} من {attendance.total} جلسة
+              </p>
             </CardContent>
           </Card>
 
@@ -153,7 +165,6 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ m
               {attendance.records.slice(0, 20).map((r) => (
                 <span
                   key={r.id}
-                  title={formatShortDate(r.session.date)}
                   className="flex items-center gap-1.5 rounded-full bg-bg-alt px-2.5 py-1 text-xs font-medium text-ink-muted"
                 >
                   <span

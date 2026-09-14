@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { canAccessFamily } from "@/lib/rbac";
+import { assertEnrollmentAccess } from "@/lib/scope";
 import { visitationUpdateSchema } from "@/lib/validation";
 
 export async function setVisitationAction(input: unknown) {
@@ -11,17 +11,19 @@ export async function setVisitationAction(input: unknown) {
   const parsed = visitationUpdateSchema.safeParse(input);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "بيانات غير صحيحة");
 
-  const { memberId, familyId, year, month, visited, note } = parsed.data;
-  if (!(await canAccessFamily(user, familyId))) {
-    throw new Error("لا تملك صلاحية تسجيل افتقاد لهذه الأسرة");
-  }
+  const { enrollmentId, year, month, visited, note } = parsed.data;
+  const enrollment = await assertEnrollmentAccess(user, enrollmentId);
 
   await prisma.visitationRecord.upsert({
-    where: { memberId_year_month: { memberId, year, month } },
-    update: { visited, note: note || null, visitedAt: visited ? new Date() : null, recordedById: user.id },
+    where: { enrollmentId_year_month: { enrollmentId, year, month } },
+    update: {
+      visited,
+      note: note || null,
+      visitedAt: visited ? new Date() : null,
+      recordedById: user.id,
+    },
     create: {
-      memberId,
-      familyId,
+      enrollmentId,
       year,
       month,
       visited,
@@ -31,6 +33,6 @@ export async function setVisitationAction(input: unknown) {
     },
   });
 
-  revalidatePath(`/visitation/${familyId}`);
+  revalidatePath(`/visitation/${enrollment.gradeId}`);
   revalidatePath("/dashboard");
 }

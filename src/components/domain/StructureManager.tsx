@@ -8,52 +8,74 @@ import { Plus, Trash2, Layers, Users, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { Input, Label, FieldError } from "@/components/ui/Input";
+import { Input, Select, Label, FieldError } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
-import { FamilyForm } from "@/components/domain/FamilyForm";
-import { createStageAction, deleteStageAction, deleteFamilyAction } from "@/actions/families";
+import {
+  createStageAction,
+  createDivisionAction,
+  createGradeAction,
+  deleteStageAction,
+  deleteDivisionAction,
+  deleteGradeAction,
+} from "@/actions/structure";
 
-type Family = { id: string; name: string; stageId: string; _count: { members: number } };
-type Stage = { id: string; name: string; order: number; families: Family[] };
+type Grade = { id: string; name: string; familyName: string | null; _count: { enrollments: number } };
+type Division = { id: string; name: string; gender: string | null; grades: Grade[] };
+type Stage = { id: string; name: string; divisions: Division[] };
 
-function StageForm({ onSuccess }: { onSuccess: () => void }) {
+type PendingDelete =
+  | { kind: "stage"; id: string; name: string }
+  | { kind: "division"; id: string; name: string }
+  | { kind: "grade"; id: string; name: string };
+
+function SimpleForm({
+  label,
+  placeholder,
+  extra,
+  onSubmit,
+}: {
+  label: string;
+  placeholder: string;
+  extra?: React.ReactNode;
+  onSubmit: (name: string) => Promise<void>;
+}) {
   const [name, setName] = React.useState("");
   const [error, setError] = React.useState("");
-  const [submitting, setSubmitting] = React.useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    setError("");
-    try {
-      await createStageAction({ name, order: 0 });
-      toast.success("تم إنشاء المرحلة بنجاح");
-      onSuccess();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "تعذر الحفظ");
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  const [busy, setBusy] = React.useState(false);
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        setError("");
+        try {
+          await onSubmit(name);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "تعذر الحفظ");
+        } finally {
+          setBusy(false);
+        }
+      }}
+      className="space-y-4"
+    >
       <div>
-        <Label htmlFor="stage-name" required>
-          اسم المرحلة
+        <Label htmlFor="entity-name" required>
+          {label}
         </Label>
         <Input
-          id="stage-name"
+          id="entity-name"
           autoFocus
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="مثال: إعدادي بنين"
+          placeholder={placeholder}
         />
         <FieldError>{error}</FieldError>
       </div>
+      {extra}
       <div className="flex justify-end">
-        <Button type="submit" loading={submitting}>
-          إنشاء المرحلة
+        <Button type="submit" loading={busy}>
+          حفظ
         </Button>
       </div>
     </form>
@@ -62,40 +84,31 @@ function StageForm({ onSuccess }: { onSuccess: () => void }) {
 
 export function StructureManager({ stages }: { stages: Stage[] }) {
   const router = useRouter();
-  const [addStageOpen, setAddStageOpen] = React.useState(false);
-  const [addFamilyStage, setAddFamilyStage] = React.useState<Stage | null>(null);
-  const [deleteStage, setDeleteStage] = React.useState<Stage | null>(null);
-  const [deleteFamily, setDeleteFamily] = React.useState<Family | null>(null);
+  const [addStage, setAddStage] = React.useState(false);
+  const [addDivisionTo, setAddDivisionTo] = React.useState<Stage | null>(null);
+  const [addGradeTo, setAddGradeTo] = React.useState<{ stage: Stage; division: Division } | null>(null);
+  const [pendingDelete, setPendingDelete] = React.useState<PendingDelete | null>(null);
+  const [gender, setGender] = React.useState("");
   const [busy, setBusy] = React.useState(false);
 
-  function refresh() {
-    setAddStageOpen(false);
-    setAddFamilyStage(null);
+  function done(message: string) {
+    toast.success(message);
+    setAddStage(false);
+    setAddDivisionTo(null);
+    setAddGradeTo(null);
+    setGender("");
     router.refresh();
   }
 
-  async function handleDeleteStage() {
-    if (!deleteStage) return;
+  async function confirmDelete() {
+    if (!pendingDelete) return;
     setBusy(true);
     try {
-      await deleteStageAction(deleteStage.id);
-      toast.success("تم حذف المرحلة");
-      setDeleteStage(null);
-      router.refresh();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "تعذر الحذف");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleDeleteFamily() {
-    if (!deleteFamily) return;
-    setBusy(true);
-    try {
-      await deleteFamilyAction(deleteFamily.id);
-      toast.success("تم حذف الأسرة");
-      setDeleteFamily(null);
+      if (pendingDelete.kind === "stage") await deleteStageAction(pendingDelete.id);
+      if (pendingDelete.kind === "division") await deleteDivisionAction(pendingDelete.id);
+      if (pendingDelete.kind === "grade") await deleteGradeAction(pendingDelete.id);
+      toast.success("تم الحذف");
+      setPendingDelete(null);
       router.refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "تعذر الحذف");
@@ -107,7 +120,7 @@ export function StructureManager({ stages }: { stages: Stage[] }) {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <Button onClick={() => setAddStageOpen(true)}>
+        <Button onClick={() => setAddStage(true)}>
           <Plus className="size-4.5" />
           مرحلة جديدة
         </Button>
@@ -120,71 +133,153 @@ export function StructureManager({ stages }: { stages: Stage[] }) {
               <div className="flex items-center gap-2">
                 <Layers className="size-4.5 text-primary" />
                 <h3 className="font-bold text-ink">{stage.name}</h3>
-                <Badge tone="neutral">{stage.families.length} أسرة</Badge>
+                <Badge tone="neutral">{stage.divisions.length} قسم</Badge>
               </div>
               <div className="flex gap-1.5">
-                <Button variant="outline" size="sm" onClick={() => setAddFamilyStage(stage)}>
+                <Button variant="outline" size="sm" onClick={() => setAddDivisionTo(stage)}>
                   <Plus className="size-3.5" />
-                  أسرة
+                  قسم
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => setDeleteStage(stage)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPendingDelete({ kind: "stage", id: stage.id, name: stage.name })}
+                >
                   <Trash2 className="size-3.5 text-error" />
                 </Button>
               </div>
             </div>
-            {stage.families.length === 0 ? (
-              <p className="p-4 text-sm text-ink-faint">لا توجد أسر في هذه المرحلة</p>
+
+            {stage.divisions.length === 0 ? (
+              <p className="p-4 text-sm text-ink-faint">لا توجد أقسام في هذه المرحلة</p>
             ) : (
-              <ul className="divide-y divide-border">
-                {stage.families.map((family) => (
-                  <li key={family.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                    <Link href={`/families/${family.id}`} className="flex min-w-0 items-center gap-2 hover:text-primary">
-                      <ChevronLeft className="size-4 shrink-0" />
-                      <span className="truncate font-medium text-ink">{family.name}</span>
-                      <span className="flex shrink-0 items-center gap-1 text-xs text-ink-faint">
-                        <Users className="size-3.5" />
-                        {family._count.members}
-                      </span>
-                    </Link>
-                    <Button variant="ghost" size="sm" onClick={() => setDeleteFamily(family)}>
-                      <Trash2 className="size-3.5 text-error" />
-                    </Button>
-                  </li>
-                ))}
-              </ul>
+              stage.divisions.map((division) => (
+                <div key={division.id} className="border-b border-border last:border-0">
+                  <div className="flex items-center justify-between gap-3 bg-bg-alt/50 px-4 py-2.5">
+                    <p className="text-sm font-bold text-ink-muted">{division.name}</p>
+                    <div className="flex gap-1.5">
+                      <Button variant="outline" size="sm" onClick={() => setAddGradeTo({ stage, division })}>
+                        <Plus className="size-3.5" />
+                        صف
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          setPendingDelete({ kind: "division", id: division.id, name: division.name })
+                        }
+                      >
+                        <Trash2 className="size-3.5 text-error" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <ul className="divide-y divide-border">
+                    {division.grades.map((grade) => (
+                      <li key={grade.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                        <Link href={`/grades/${grade.id}`} className="flex min-w-0 items-center gap-2 hover:text-primary">
+                          <ChevronLeft className="size-4 shrink-0" />
+                          <span className="truncate font-medium text-ink">{grade.name}</span>
+                          {grade.familyName && (
+                            <span className="truncate text-xs text-primary-ink">— {grade.familyName}</span>
+                          )}
+                          <span className="flex shrink-0 items-center gap-1 text-xs text-ink-faint">
+                            <Users className="size-3.5" />
+                            {grade._count.enrollments}
+                          </span>
+                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setPendingDelete({ kind: "grade", id: grade.id, name: grade.name })}
+                        >
+                          <Trash2 className="size-3.5 text-error" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))
             )}
           </div>
         ))}
       </div>
 
-      <Modal open={addStageOpen} onClose={() => setAddStageOpen(false)} title="مرحلة جديدة">
-        <StageForm onSuccess={refresh} />
+      <Modal open={addStage} onClose={() => setAddStage(false)} title="مرحلة جديدة" size="sm">
+        <SimpleForm
+          label="اسم المرحلة"
+          placeholder="مثال: ثانوي"
+          onSubmit={async (name) => {
+            await createStageAction({ name, order: stages.length });
+            done("تم إنشاء المرحلة");
+          }}
+        />
       </Modal>
 
-      <Modal open={!!addFamilyStage} onClose={() => setAddFamilyStage(null)} title="أسرة جديدة">
-        {addFamilyStage && (
-          <FamilyForm stages={[{ id: addFamilyStage.id, name: addFamilyStage.name }]} onSuccess={refresh} />
+      <Modal
+        open={!!addDivisionTo}
+        onClose={() => setAddDivisionTo(null)}
+        title={addDivisionTo ? `قسم جديد في ${addDivisionTo.name}` : ""}
+        size="sm"
+      >
+        {addDivisionTo && (
+          <SimpleForm
+            label="اسم القسم"
+            placeholder="مثال: بنين"
+            extra={
+              <div>
+                <Label htmlFor="division-gender">النوع</Label>
+                <Select id="division-gender" value={gender} onChange={(e) => setGender(e.target.value)}>
+                  <option value="">غير مُقسّم (مثل الحضانة)</option>
+                  <option value="MALE">بنين</option>
+                  <option value="FEMALE">بنات</option>
+                </Select>
+              </div>
+            }
+            onSubmit={async (name) => {
+              await createDivisionAction({
+                stageId: addDivisionTo.id,
+                name,
+                gender,
+                order: addDivisionTo.divisions.length,
+              });
+              done("تم إنشاء القسم");
+            }}
+          />
+        )}
+      </Modal>
+
+      <Modal
+        open={!!addGradeTo}
+        onClose={() => setAddGradeTo(null)}
+        title={addGradeTo ? `صف جديد في ${addGradeTo.stage.name} › ${addGradeTo.division.name}` : ""}
+        size="sm"
+      >
+        {addGradeTo && (
+          <SimpleForm
+            label="اسم الصف"
+            placeholder="مثال: الصف الأول"
+            onSubmit={async (name) => {
+              await createGradeAction({
+                divisionId: addGradeTo.division.id,
+                name,
+                familyName: "",
+                order: addGradeTo.division.grades.length,
+              });
+              done("تم إنشاء الصف");
+            }}
+          />
         )}
       </Modal>
 
       <ConfirmDialog
-        open={!!deleteStage}
-        onOpenChange={(open) => !open && setDeleteStage(null)}
-        title="حذف المرحلة"
-        description={deleteStage ? `هل أنت متأكد من حذف مرحلة "${deleteStage.name}"؟` : ""}
-        confirmLabel="حذف نهائيًا"
+        open={!!pendingDelete}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title="تأكيد الحذف"
+        description={pendingDelete ? `هل أنت متأكد من حذف "${pendingDelete.name}"؟` : ""}
+        confirmLabel="حذف"
         loading={busy}
-        onConfirm={handleDeleteStage}
-      />
-
-      <ConfirmDialog
-        open={!!deleteFamily}
-        onOpenChange={(open) => !open && setDeleteFamily(null)}
-        title="حذف الأسرة"
-        description={deleteFamily ? `هل أنت متأكد من حذف أسرة "${deleteFamily.name}"؟` : ""}
-        confirmLabel="حذف نهائيًا"
-        loading={busy}
-        onConfirm={handleDeleteFamily}
+        onConfirm={confirmDelete}
       />
     </div>
   );

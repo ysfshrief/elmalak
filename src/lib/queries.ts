@@ -1,109 +1,161 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { getAccessibleFamilyIds } from "@/lib/rbac";
+import { resolveScope, canAccessGrade, type ScopedUser, type Scope } from "@/lib/scope";
 import { daysUntilNextBirthday } from "@/lib/utils";
-import type { User, Role } from "@prisma/client";
 
-type ScopedUser = Pick<User, "id" | "role" | "stageId"> & {
-  assignments: { familyId: string }[];
-};
-
-export async function getStages() {
-  return prisma.stage.findMany({ orderBy: { order: "asc" } });
+/** الصفوف المسموح بها كشرط Prisma على أي جدول يملك `gradeId`. */
+function gradeFilter(scope: Scope) {
+  return scope === "ALL" ? {} : { gradeId: { in: scope } };
 }
 
-export async function getAccessibleFamilies(user: ScopedUser) {
-  const ids = await getAccessibleFamilyIds(user);
-  return prisma.family.findMany({
-    where: ids === null ? {} : { id: { in: ids } },
+export async function getService() {
+  return prisma.service.findFirst();
+}
+
+export async function getCurrentAcademicYear() {
+  return (
+    (await prisma.academicYear.findFirst({ where: { isCurrent: true } })) ??
+    (await prisma.academicYear.findFirst({ orderBy: { startDate: "desc" } }))
+  );
+}
+
+export async function getAcademicYears() {
+  return prisma.academicYear.findMany({ orderBy: { startDate: "desc" } });
+}
+
+/**
+ * الهيكل التنظيمي كما يراه المستخدم: المراحل والأقسام والصفوف التي تقع
+ * داخل نطاقه فقط، مع عدد المخدومين في كل صف للسنة الحالية.
+ */
+export async function getVisibleHierarchy(user: ScopedUser, academicYearId?: string) {
+  const scope = await resolveScope(user);
+  const year = academicYearId ?? (await getCurrentAcademicYear())?.id;
+
+  const stages = await prisma.stage.findMany({
+    orderBy: { order: "asc" },
     include: {
-      stage: true,
-      _count: { select: { members: true } },
+      divisions: {
+        orderBy: { order: "asc" },
+        include: {
+          grades: {
+            where: scope === "ALL" ? {} : { id: { in: scope } },
+            orderBy: { order: "asc" },
+            include: {
+              _count: {
+                select: { enrollments: year ? { where: { academicYearId: year } } : true },
+              },
+            },
+          },
+        },
+      },
     },
-    orderBy: [{ stage: { order: "asc" } }, { name: "asc" }],
   });
+
+  // أخفِ الأقسام والمراحل التي لا يرى المستخدم أي صف بداخلها.
+  return stages
+    .map((stage) => ({
+      ...stage,
+      divisions: stage.divisions.filter((d) => d.grades.length > 0),
+    }))
+    .filter((stage) => stage.divisions.length > 0);
 }
 
-export async function getFamilyDetail(user: ScopedUser, familyId: string) {
-  const ids = await getAccessibleFamilyIds(user);
-  if (ids !== null && !ids.includes(familyId)) return null;
+export async function getGradeDetail(user: ScopedUser, gradeId: string, academicYearId?: string) {
+  const scope = await resolveScope(user);
+  if (!canAccessGrade(scope, gradeId)) return null;
 
-  return prisma.family.findUnique({
-    where: { id: familyId },
+  const year = academicYearId ?? (await getCurrentAcademicYear())?.id;
+  if (!year) return null;
+
+  return prisma.grade.findUnique({
+    where: { id: gradeId },
     include: {
-      stage: true,
-      members: {
-        include: { phones: true },
-        orderBy: { fullName: "asc" },
+      division: { include: { stage: true } },
+      enrollments: {
+        where: { academicYearId: year },
+        include: { child: { include: { phones: true } } },
+        orderBy: { child: { fullName: "asc" } },
       },
     },
   });
 }
 
-export async function getMemberDetail(user: ScopedUser, memberId: string) {
-  const member = await prisma.member.findUnique({
-    where: { id: memberId },
-    include: { phones: true, family: { include: { stage: true } } },
+export async function getEnrollmentDetail(user: ScopedUser, enrollmentId: string) {
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { id: enrollmentId },
+    include: {
+      child: { include: { phones: true } },
+      academicYear: true,
+      grade: { include: { division: { include: { stage: true } } } },
+    },
   });
-  if (!member) return null;
-  const ids = await getAccessibleFamilyIds(user);
-  if (ids !== null && !ids.includes(member.familyId)) return null;
-  return member;
-}
+  if (!enrollment) return null;
 
-function monthRange(year: number, month: number) {
-  const start = new Date(year, month - 1, 1);
-  const end = new Date(year, month, 1);
-  return { start, end };
+  const scope = await resolveScope(user);
+  if (!canAccessGrade(scope, enrollment.gradeId)) return null;
+  return enrollment;
 }
 
 export async function getDashboardData(user: ScopedUser) {
-  const familyIds = await getAccessibleFamilyIds(user);
-  const familyFilter = familyIds === null ? {} : { id: { in: familyIds } };
+  const scope = await resolveScope(user);
+  const year = await getCurrentAcademicYear();
+  const yearFilter = year ? { academicYearId: year.id } : {};
 
-  const [familyCount, memberCount, families] = await Promise.all([
-    prisma.family.count({ where: familyFilter }),
-    prisma.member.count({ where: { family: familyFilter, isActive: true } }),
-    prisma.family.findMany({ where: familyFilter, select: { id: true, name: true } }),
+  const gradeScope = scope === "ALL" ? {} : { id: { in: scope } };
+
+  const [gradeCount, childCount, grades] = await Promise.all([
+    prisma.grade.count({ where: gradeScope }),
+    prisma.enrollment.count({
+      where: { ...gradeFilter(scope), ...yearFilter, child: { isActive: true } },
+    }),
+    prisma.grade.findMany({ where: gradeScope, select: { id: true } }),
   ]);
 
-  const scopedFamilyIds = families.map((f) => f.id);
-
+  const gradeIds = grades.map((g) => g.id);
   const now = new Date();
-  const { start, end } = monthRange(now.getFullYear(), now.getMonth() + 1);
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-  const [attendanceRecords, visitationRecords, activeMembersInScope] = await Promise.all([
+  const [attendanceRecords, visitationRecords] = await Promise.all([
     prisma.attendanceRecord.findMany({
-      where: { session: { familyId: { in: scopedFamilyIds }, date: { gte: start, lt: end } } },
+      where: { session: { gradeId: { in: gradeIds }, date: { gte: start, lt: end } } },
       select: { status: true },
     }),
     prisma.visitationRecord.findMany({
-      where: { familyId: { in: scopedFamilyIds }, year: now.getFullYear(), month: now.getMonth() + 1 },
+      where: {
+        enrollment: { gradeId: { in: gradeIds }, ...yearFilter },
+        year: now.getFullYear(),
+        month: now.getMonth() + 1,
+      },
       select: { visited: true },
     }),
-    prisma.member.count({ where: { familyId: { in: scopedFamilyIds }, isActive: true } }),
   ]);
 
   const present = attendanceRecords.filter((r) => r.status === "PRESENT").length;
   const attendanceRate =
     attendanceRecords.length > 0 ? Math.round((present / attendanceRecords.length) * 100) : null;
 
-  const visitedCount = visitationRecords.filter((v) => v.visited).length;
-  const visitationRate =
-    activeMembersInScope > 0 ? Math.round((visitedCount / activeMembersInScope) * 100) : null;
+  const visited = visitationRecords.filter((v) => v.visited).length;
+  const visitationRate = childCount > 0 ? Math.round((visited / childCount) * 100) : null;
 
   const upcomingBirthdays = await getUpcomingBirthdays(user, 30, 6);
 
-  const [recentSessions, recentMembers] = await Promise.all([
+  const [recentSessions, recentEnrollments] = await Promise.all([
     prisma.attendanceSession.findMany({
-      where: { familyId: { in: scopedFamilyIds } },
-      include: { family: true, _count: { select: { records: { where: { status: "PRESENT" } } } } },
+      where: { gradeId: { in: gradeIds } },
+      include: {
+        grade: { include: { division: { include: { stage: true } } } },
+        _count: { select: { records: { where: { status: "PRESENT" } } } },
+      },
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
-    prisma.member.findMany({
-      where: { familyId: { in: scopedFamilyIds } },
-      include: { family: true },
+    prisma.enrollment.findMany({
+      where: { gradeId: { in: gradeIds }, ...yearFilter },
+      include: {
+        child: true,
+        grade: { include: { division: { include: { stage: true } } } },
+      },
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
@@ -114,43 +166,60 @@ export async function getDashboardData(user: ScopedUser) {
       type: "attendance" as const,
       id: s.id,
       date: s.createdAt,
-      familyName: s.family.name,
+      where: gradeTitle(s.grade),
       meta: `${s._count.records} حاضر بتاريخ ${s.date.toLocaleDateString("ar-EG")}`,
     })),
-    ...recentMembers.map((m) => ({
-      type: "member" as const,
-      id: m.id,
-      date: m.createdAt,
-      familyName: m.family.name,
-      meta: m.fullName,
+    ...recentEnrollments.map((e) => ({
+      type: "child" as const,
+      id: e.id,
+      date: e.createdAt,
+      where: gradeTitle(e.grade),
+      meta: e.child.fullName,
     })),
   ]
     .sort((a, b) => b.date.getTime() - a.date.getTime())
     .slice(0, 6);
 
   return {
-    familyCount,
-    memberCount,
+    gradeCount,
+    childCount,
     attendanceRate,
     visitationRate,
     upcomingBirthdays,
     recentActivity,
+    academicYear: year,
   };
 }
 
+type GradeWithPath = {
+  name: string;
+  familyName: string | null;
+  division: { name: string; stage: { name: string } };
+};
+
+/** «إعدادي › بنين › الصف الثاني» — مسار الصف كاملًا للعرض. */
+export function gradeTitle(grade: GradeWithPath) {
+  return `${grade.division.stage.name} › ${grade.division.name} › ${grade.name}`;
+}
+
 export async function getUpcomingBirthdays(user: ScopedUser, withinDays = 30, limit?: number) {
-  const familyIds = await getAccessibleFamilyIds(user);
-  const members = await prisma.member.findMany({
+  const scope = await resolveScope(user);
+  const year = await getCurrentAcademicYear();
+
+  const enrollments = await prisma.enrollment.findMany({
     where: {
-      family: familyIds === null ? {} : { id: { in: familyIds } },
-      isActive: true,
-      birthDate: { not: null },
+      ...gradeFilter(scope),
+      ...(year ? { academicYearId: year.id } : {}),
+      child: { isActive: true, birthDate: { not: null } },
     },
-    include: { family: true },
+    include: {
+      child: true,
+      grade: { include: { division: { include: { stage: true } } } },
+    },
   });
 
-  const withDays = members
-    .map((m) => ({ member: m, days: daysUntilNextBirthday(m.birthDate!) }))
+  const withDays = enrollments
+    .map((e) => ({ enrollment: e, child: e.child, days: daysUntilNextBirthday(e.child.birthDate!) }))
     .filter((x) => x.days <= withinDays)
     .sort((a, b) => a.days - b.days);
 
@@ -158,97 +227,121 @@ export async function getUpcomingBirthdays(user: ScopedUser, withinDays = 30, li
 }
 
 export async function getBirthdaysByMonth(user: ScopedUser) {
-  const familyIds = await getAccessibleFamilyIds(user);
-  const members = await prisma.member.findMany({
+  const scope = await resolveScope(user);
+  const year = await getCurrentAcademicYear();
+
+  const enrollments = await prisma.enrollment.findMany({
     where: {
-      family: familyIds === null ? {} : { id: { in: familyIds } },
-      isActive: true,
-      birthDate: { not: null },
+      ...gradeFilter(scope),
+      ...(year ? { academicYearId: year.id } : {}),
+      child: { isActive: true, birthDate: { not: null } },
     },
-    include: { family: true },
-    orderBy: { birthDate: "asc" },
+    include: {
+      child: true,
+      grade: { include: { division: { include: { stage: true } } } },
+    },
   });
 
-  const byMonth: Record<number, typeof members> = {};
+  const byMonth: Record<number, typeof enrollments> = {};
   for (let m = 1; m <= 12; m++) byMonth[m] = [];
-  for (const member of members) {
-    const month = member.birthDate!.getMonth() + 1;
-    byMonth[month]!.push(member);
-  }
-  for (const month of Object.keys(byMonth)) {
-    byMonth[Number(month)]!.sort((a, b) => a.birthDate!.getDate() - b.birthDate!.getDate());
+  for (const e of enrollments) byMonth[e.child.birthDate!.getMonth() + 1]!.push(e);
+  for (const m of Object.keys(byMonth)) {
+    byMonth[Number(m)]!.sort((a, b) => a.child.birthDate!.getDate() - b.child.birthDate!.getDate());
   }
   return byMonth;
 }
 
-export async function getAttendanceSessions(familyId: string) {
+export async function getAttendanceSessions(user: ScopedUser, gradeId: string) {
+  const scope = await resolveScope(user);
+  if (!canAccessGrade(scope, gradeId)) return [];
   return prisma.attendanceSession.findMany({
-    where: { familyId },
+    where: { gradeId },
     include: { records: true },
     orderBy: { date: "desc" },
   });
 }
 
-export async function getAttendanceSessionByDate(familyId: string, date: Date) {
+export async function getAttendanceSessionByDate(user: ScopedUser, gradeId: string, date: Date) {
+  const scope = await resolveScope(user);
+  if (!canAccessGrade(scope, gradeId)) return null;
   return prisma.attendanceSession.findUnique({
-    where: { familyId_date: { familyId, date } },
+    where: { gradeId_date: { gradeId, date } },
     include: { records: true },
   });
 }
 
-export async function getAttendanceSession(sessionId: string) {
-  return prisma.attendanceSession.findUnique({
-    where: { id: sessionId },
-    include: { records: true, family: { include: { members: { orderBy: { fullName: "asc" } } } } },
-  });
-}
+export async function getChildAttendanceStats(user: ScopedUser, enrollmentId: string) {
+  const enrollment = await getEnrollmentDetail(user, enrollmentId);
+  if (!enrollment) return { total: 0, present: 0, rate: null, records: [] };
 
-export async function getMemberAttendanceStats(memberId: string) {
   const records = await prisma.attendanceRecord.findMany({
-    where: { memberId },
+    where: { enrollmentId },
     include: { session: true },
     orderBy: { session: { date: "desc" } },
   });
   const total = records.length;
   const present = records.filter((r) => r.status === "PRESENT").length;
-  return {
-    total,
-    present,
-    rate: total > 0 ? Math.round((present / total) * 100) : null,
-    records,
-  };
+  return { total, present, rate: total > 0 ? Math.round((present / total) * 100) : null, records };
 }
 
-export async function getMemberVisitationHistory(memberId: string, take = 12) {
+export async function getVisitationHistory(user: ScopedUser, enrollmentId: string, take = 12) {
+  const enrollment = await getEnrollmentDetail(user, enrollmentId);
+  if (!enrollment) return [];
   return prisma.visitationRecord.findMany({
-    where: { memberId },
+    where: { enrollmentId },
     orderBy: [{ year: "desc" }, { month: "desc" }],
     take,
   });
 }
 
-export async function getVisitationMonth(familyId: string, year: number, month: number) {
-  const [members, records] = await Promise.all([
-    prisma.member.findMany({ where: { familyId, isActive: true }, orderBy: { fullName: "asc" } }),
-    prisma.visitationRecord.findMany({ where: { familyId, year, month } }),
-  ]);
+export async function getVisitationMonth(
+  user: ScopedUser,
+  gradeId: string,
+  year: number,
+  month: number
+) {
+  const grade = await getGradeDetail(user, gradeId);
+  if (!grade) return [];
 
-  const byMember = new Map(records.map((r) => [r.memberId, r]));
-  return members.map((m) => ({ member: m, record: byMember.get(m.id) ?? null }));
+  const records = await prisma.visitationRecord.findMany({
+    where: { enrollment: { gradeId }, year, month },
+  });
+  const byEnrollment = new Map(records.map((r) => [r.enrollmentId, r]));
+
+  return grade.enrollments.map((e) => ({
+    enrollment: e,
+    child: e.child,
+    record: byEnrollment.get(e.id) ?? null,
+  }));
 }
+
+// ───────── إدارة (المسؤول) ─────────
 
 export async function getAllUsers() {
   return prisma.user.findMany({
-    include: { stage: true, assignments: { include: { family: true } } },
+    include: {
+      assignments: {
+        include: {
+          service: true,
+          stage: true,
+          division: { include: { stage: true } },
+          grade: { include: { division: { include: { stage: true } } } },
+        },
+      },
+    },
     orderBy: { createdAt: "asc" },
   });
 }
 
-export async function getAllFamiliesFlat() {
-  return prisma.family.findMany({
-    include: { stage: true },
-    orderBy: [{ stage: { order: "asc" } }, { name: "asc" }],
+/** الهيكل الكامل بلا تصفية — لشاشات المسؤول واختيار نطاق التكليف. */
+export async function getFullHierarchy() {
+  return prisma.stage.findMany({
+    orderBy: { order: "asc" },
+    include: {
+      divisions: {
+        orderBy: { order: "asc" },
+        include: { grades: { orderBy: { order: "asc" }, include: { _count: { select: { enrollments: true } } } } },
+      },
+    },
   });
 }
-
-export type { Role };

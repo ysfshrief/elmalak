@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 const TABS = [
   { href: "/settings/users", label: "المستخدمون" },
-  { href: "/settings/structure", label: "المراحل والأسر" },
+  { href: "/settings/structure", label: "الهيكل التنظيمي" },
 ];
 
 export function SettingsTabs() {

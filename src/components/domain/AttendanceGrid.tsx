@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { createAttendanceSessionAction, setAttendanceStatusAction } from "@/actions/attendance";
 import type { AttendanceStatus } from "@prisma/client";
 
-type Member = { id: string; fullName: string };
+type Row = { enrollmentId: string; fullName: string };
 
 const STATUS_CONFIG: Record<AttendanceStatus, { label: string; icon: typeof Check; tone: string }> = {
   PRESENT: { label: "حاضر", icon: Check, tone: "bg-success text-white" },
@@ -20,16 +20,16 @@ const STATUS_CONFIG: Record<AttendanceStatus, { label: string; icon: typeof Chec
 };
 
 export function AttendanceGrid({
-  familyId,
+  gradeId,
   date,
   sessionId,
-  members,
+  rows,
   initialStatuses,
 }: {
-  familyId: string;
+  gradeId: string;
   date: string;
   sessionId: string | null;
-  members: Member[];
+  rows: Row[];
   initialStatuses: Record<string, AttendanceStatus>;
 }) {
   const router = useRouter();
@@ -45,10 +45,10 @@ export function AttendanceGrid({
   async function handleStart() {
     setCreating(true);
     try {
-      const session = await createAttendanceSessionAction({ familyId, date });
+      const session = await createAttendanceSessionAction({ gradeId, date });
       setCurrentSessionId(session.id);
       const next: Record<string, AttendanceStatus> = {};
-      members.forEach((m) => (next[m.id] = "ABSENT"));
+      rows.forEach((r) => (next[r.enrollmentId] = "ABSENT"));
       setStatuses(next);
       toast.success("تم بدء تسجيل الحضور لهذا اليوم");
       router.refresh();
@@ -59,14 +59,14 @@ export function AttendanceGrid({
     }
   }
 
-  async function handleSetStatus(memberId: string, status: AttendanceStatus) {
+  async function handleSetStatus(enrollmentId: string, status: AttendanceStatus) {
     if (!currentSessionId) return;
-    const previous = statuses[memberId];
-    setStatuses((s) => ({ ...s, [memberId]: status }));
+    const previous = statuses[enrollmentId];
+    setStatuses((s) => ({ ...s, [enrollmentId]: status }));
     try {
-      await setAttendanceStatusAction(currentSessionId, memberId, status);
+      await setAttendanceStatusAction(currentSessionId, enrollmentId, status);
     } catch (e) {
-      setStatuses((s) => ({ ...s, [memberId]: previous! }));
+      setStatuses((s) => ({ ...s, [enrollmentId]: previous! }));
       toast.error(e instanceof Error ? e.message : "تعذر حفظ الحالة");
     }
   }
@@ -76,7 +76,7 @@ export function AttendanceGrid({
       <EmptyState
         icon={ClipboardCheck}
         title="لم يتم تسجيل حضور هذا اليوم بعد"
-        description="اضغط على الزر التالي لبدء تسجيل حضور أعضاء الأسرة لهذا التاريخ"
+        description="اضغط على الزر التالي لبدء تسجيل حضور مخدومي هذا الصف لهذا التاريخ"
         action={
           <Button onClick={handleStart} loading={creating}>
             بدء تسجيل الحضور
@@ -90,16 +90,16 @@ export function AttendanceGrid({
     <div className="space-y-3">
       <div className="flex items-center justify-between rounded-[var(--radius-md)] bg-bg-alt px-4 py-2.5 text-sm">
         <span className="font-semibold text-ink">
-          الحاضرون: <span className="tabular-nums text-success">{presentCount}</span> / {members.length}
+          الحاضرون: <span className="tabular-nums text-success">{presentCount}</span> / {rows.length}
         </span>
       </div>
 
       <ul className="space-y-2">
-        {members.map((m) => {
-          const status = statuses[m.id] ?? "ABSENT";
+        {rows.map((m) => {
+          const status = statuses[m.enrollmentId] ?? "ABSENT";
           return (
             <li
-              key={m.id}
+              key={m.enrollmentId}
               className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-border bg-surface p-3"
             >
               <Avatar name={m.fullName} size="sm" />
@@ -113,7 +113,7 @@ export function AttendanceGrid({
                     <button
                       key={s}
                       type="button"
-                      onClick={() => handleSetStatus(m.id, s)}
+                      onClick={() => handleSetStatus(m.enrollmentId, s)}
                       aria-pressed={active}
                       aria-label={cfg.label}
                       className={cn(

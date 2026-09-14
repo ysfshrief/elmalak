@@ -1,4 +1,8 @@
 // Prisma schema — خدمة التربية الكنسية (كنيسة رئيس الملائكة الجليل ميخائيل بدمنهور)
+//
+// الهيكل التنظيمي الحقيقي للخدمة:
+//   Service ← Stage ← Division ← Grade ← Enrollment ← Child
+// والصلاحيات = Role (ماذا يفعل) + Assignment (أين) — منفصلان تمامًا.
 
 generator client {
   provider = "prisma-client-js"
@@ -9,10 +13,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// ماذا يستطيع المستخدم أن يفعل. أين يفعله تحدده جداول Assignment.
 enum Role {
-  SUPER_ADMIN
-  STAGE_COORDINATOR
-  FAMILY_SERVANT
+  ADMIN // مسؤول النظام
+  SERVICE_SECRETARY // أمين خدمة التربية الكنسية
+  STAGE_SECRETARY // أمين / أمينة مرحلة
+  SERVANT // خادم / خادمة
+}
+
+/// يُستخدم لصياغة المسمّى الصحيح (أمين/أمينة، خادم/خادمة) ولتصنيف المخدومين.
+enum Gender {
+  MALE
+  FEMALE
 }
 
 enum AttendanceStatus {
@@ -21,98 +33,192 @@ enum AttendanceStatus {
   EXCUSED
 }
 
+// ───────────────────────── الهيكل التنظيمي ─────────────────────────
+
+model Service {
+  id         String @id @default(cuid())
+  name       String // خدمة التربية الكنسية
+  churchName String // كنيسة رئيس الملائكة الجليل ميخائيل بدمنهور
+
+  stages      Stage[]
+  assignments Assignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Stage {
+  id        String  @id @default(cuid())
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  name      String // حضانة / ابتدائي / إعدادي / ثانوي
+  order     Int     @default(0)
+
+  divisions   Division[]
+  assignments Assignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([serviceId, name])
+}
+
+/// بنين / بنات. مرحلة الحضانة لها قسم واحد غير مُقسّم بالنوع (gender = null)
+/// حتى يبقى كل مخدوم على نفس المسار الموحّد في الاستعلامات والصلاحيات.
+model Division {
+  id      String  @id @default(cuid())
+  stageId String
+  stage   Stage   @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  name    String
+  gender  Gender?
+  order   Int     @default(0)
+
+  grades      Grade[]
+  assignments Assignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([stageId, name])
+}
+
+/// الصف الدراسي. `familyName` هو اسم أسرة الفصل (مثل: أسرة الملاك ميخائيل
+/// والقديس أبانوب) ويسجّله أمين المرحلة.
+model Grade {
+  id         String   @id @default(cuid())
+  divisionId String
+  division   Division @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+  name       String // الصف الأول … / حضانة
+  familyName String?
+  order      Int      @default(0)
+
+  enrollments Enrollment[]
+  sessions    AttendanceSession[]
+  assignments Assignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([divisionId, name])
+}
+
+model AcademicYear {
+  id        String   @id @default(cuid())
+  name      String   @unique // 2026/2027
+  startDate DateTime
+  endDate   DateTime
+  isCurrent Boolean  @default(false)
+
+  enrollments Enrollment[]
+  sessions    AttendanceSession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ───────────────────────── المخدومون ─────────────────────────
+
+model Child {
+  id               String    @id @default(cuid())
+  fullName         String
+  gender           Gender?
+  birthDate        DateTime?
+  school           String?
+  confessionFather String?
+  address          String?
+  notes            String?
+  isActive         Boolean   @default(true)
+
+  phones      ChildPhone[]
+  enrollments Enrollment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ChildPhone {
+  id      String @id @default(cuid())
+  childId String
+  child   Child  @relation(fields: [childId], references: [id], onDelete: Cascade)
+  label   String // الأب / الأم / المخدوم / البيت / الأخ
+  number  String
+}
+
+/// قيد المخدوم في صف خلال سنة دراسية. الترفيع = قيد جديد في السنة التالية،
+/// فيبقى سجل الحضور القديم منسوبًا للصف الذي كان فيه فعلًا.
+model Enrollment {
+  id             String       @id @default(cuid())
+  childId        String
+  child          Child        @relation(fields: [childId], references: [id], onDelete: Cascade)
+  gradeId        String
+  grade          Grade        @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  academicYearId String
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+
+  attendanceRecords AttendanceRecord[]
+  visitations       VisitationRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([childId, academicYearId])
+  @@index([gradeId, academicYearId])
+}
+
+// ───────────────────────── المستخدمون والصلاحيات ─────────────────────────
+
 model User {
-  id           String   @id @default(cuid())
+  id           String  @id @default(cuid())
   name         String
-  username     String   @unique
+  username     String  @unique
   passwordHash String
   role         Role
+  gender       Gender?
   phone        String?
-  isActive     Boolean  @default(true)
+  isActive     Boolean @default(true)
 
-  stageId String?
-  stage   Stage?  @relation(fields: [stageId], references: [id])
-
-  assignments FamilyAssignment[]
+  assignments Assignment[]
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   lastLoginAt DateTime?
 }
 
-model Stage {
-  id    String @id @default(cuid())
-  name  String @unique
-  order Int    @default(0)
+/// نطاق عمل المستخدم. يُملأ عمود واحد فقط من الأربعة، ويحدد أي جزء من
+/// الهيكل يراه هذا المستخدم. مستخدم واحد يمكن أن يكون له أكثر من تكليف.
+///
+/// أُستخدمت أعمدة مفاتيح منفصلة بدلًا من (scopeType, scopeId) حتى تحافظ
+/// قاعدة البيانات نفسها على سلامة الروابط والحذف المتسلسل.
+model Assignment {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  families     Family[]
-  coordinators User[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Family {
-  id      String @id @default(cuid())
-  name    String
-  stageId String
-  stage   Stage  @relation(fields: [stageId], references: [id])
-
-  members     Member[]
-  sessions    AttendanceSession[]
-  visitations VisitationRecord[]
-  assignments FamilyAssignment[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model FamilyAssignment {
-  id       String @id @default(cuid())
-  userId   String
-  familyId String
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  family   Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  serviceId  String?
+  service    Service?  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  stageId    String?
+  stage      Stage?    @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  divisionId String?
+  division   Division? @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+  gradeId    String?
+  grade      Grade?    @relation(fields: [gradeId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
-  @@unique([userId, familyId])
+  @@unique([userId, serviceId, stageId, divisionId, gradeId])
+  @@index([userId])
 }
 
-model Member {
-  id               String    @id @default(cuid())
-  familyId         String
-  family           Family    @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  fullName         String
-  address          String?
-  birthDate        DateTime?
-  school           String?
-  confessionFather String?
-  notes            String?
-  isActive         Boolean   @default(true)
-
-  phones            MemberPhone[]
-  attendanceRecords AttendanceRecord[]
-  visitations       VisitationRecord[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model MemberPhone {
-  id       String @id @default(cuid())
-  memberId String
-  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  label    String
-  number   String
-}
+// ───────────────────────── الحضور والافتقاد ─────────────────────────
 
 model AttendanceSession {
-  id       String   @id @default(cuid())
-  familyId String
-  family   Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  date     DateTime
-  label    String?
+  id             String       @id @default(cuid())
+  gradeId        String
+  grade          Grade        @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  academicYearId String
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  date           DateTime
+  label          String?
 
   createdById String?
 
@@ -120,40 +226,38 @@ model AttendanceSession {
 
   createdAt DateTime @default(now())
 
-  @@unique([familyId, date])
+  @@unique([gradeId, date])
 }
 
 model AttendanceRecord {
-  id        String            @id @default(cuid())
-  sessionId String
-  session   AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  memberId  String
-  member    Member            @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  status    AttendanceStatus  @default(ABSENT)
-  note      String?
+  id           String            @id @default(cuid())
+  sessionId    String
+  session      AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  enrollmentId String
+  enrollment   Enrollment        @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  status       AttendanceStatus  @default(ABSENT)
+  note         String?
 
   updatedAt DateTime @updatedAt
 
-  @@unique([sessionId, memberId])
+  @@unique([sessionId, enrollmentId])
 }
 
 model VisitationRecord {
-  id       String @id @default(cuid())
-  familyId String
-  family   Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  memberId String
-  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  id           String     @id @default(cuid())
+  enrollmentId String
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
 
-  year    Int
-  month   Int
-  visited Boolean   @default(false)
+  year      Int
+  month     Int
+  visited   Boolean   @default(false)
   visitedAt DateTime?
-  note    String?
+  note      String?
 
   recordedById String?
 
-  updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@unique([memberId, year, month])
+  @@unique([enrollmentId, year, month])
 }

@@ -1,19 +1,10 @@
 import type { Metadata } from "next";
-import { prisma } from "@/lib/prisma";
+import { getFullHierarchy } from "@/lib/queries";
 import { StructureManager } from "@/components/domain/StructureManager";
 
-export const metadata: Metadata = { title: "المراحل والأسر" };
+export const metadata: Metadata = { title: "الهيكل التنظيمي" };
 
 export default async function SettingsStructurePage() {
-  const stages = await prisma.stage.findMany({
-    orderBy: { order: "asc" },
-    include: {
-      families: {
-        include: { _count: { select: { members: true } } },
-        orderBy: { name: "asc" },
-      },
-    },
-  });
-
+  const stages = await getFullHierarchy();
   return <StructureManager stages={stages} />;
 }

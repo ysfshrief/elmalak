@@ -6,23 +6,26 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
-import { memberSchema } from "@/lib/validation";
+import { childSchema } from "@/lib/validation";
 import { PHONE_LABELS } from "@/lib/utils";
 import { Input, Textarea, Select, Label, FieldError } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { createMemberAction, updateMemberAction } from "@/actions/members";
+import { createChildAction, updateChildAction } from "@/actions/children";
 
-type FormValues = z.infer<typeof memberSchema>;
+type FormValues = z.infer<typeof childSchema>;
 
-export function MemberForm({
-  familyId,
-  member,
+export function ChildForm({
+  gradeId,
+  enrollmentId,
+  child,
   onSuccess,
 }: {
-  familyId: string;
-  member?: {
-    id: string;
+  gradeId: string;
+  /** موجود عند التعديل فقط. */
+  enrollmentId?: string;
+  child?: {
     fullName: string;
+    gender: string | null;
     address: string | null;
     birthDate: Date | null;
     school: string | null;
@@ -38,16 +41,17 @@ export function MemberForm({
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
-    resolver: zodResolver(memberSchema),
+    resolver: zodResolver(childSchema),
     defaultValues: {
-      fullName: member?.fullName ?? "",
-      familyId,
-      address: member?.address ?? "",
-      birthDate: member?.birthDate ? member.birthDate.toISOString().slice(0, 10) : "",
-      school: member?.school ?? "",
-      confessionFather: member?.confessionFather ?? "",
-      notes: member?.notes ?? "",
-      phones: member?.phones ?? [{ label: "الأب", number: "" }],
+      fullName: child?.fullName ?? "",
+      gradeId,
+      gender: (child?.gender ?? "") as FormValues["gender"],
+      address: child?.address ?? "",
+      birthDate: child?.birthDate ? child.birthDate.toISOString().slice(0, 10) : "",
+      school: child?.school ?? "",
+      confessionFather: child?.confessionFather ?? "",
+      notes: child?.notes ?? "",
+      phones: child?.phones ?? [{ label: "الأب", number: "" }],
     },
   });
 
@@ -55,11 +59,11 @@ export function MemberForm({
 
   async function onSubmit(values: FormValues) {
     try {
-      if (member) {
-        await updateMemberAction(member.id, values);
-        toast.success("تم تحديث بيانات المخدوم بنجاح");
+      if (enrollmentId) {
+        await updateChildAction(enrollmentId, values);
+        toast.success("تم تحديث بيانات المخدوم");
       } else {
-        await createMemberAction(values);
+        await createChildAction(values);
         toast.success("تم إضافة المخدوم بنجاح");
       }
       onSuccess();
@@ -70,7 +74,7 @@ export function MemberForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-      <input type="hidden" {...register("familyId")} />
+      <input type="hidden" {...register("gradeId")} />
 
       <div>
         <Label htmlFor="fullName" required>
@@ -83,17 +87,17 @@ export function MemberForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <Label htmlFor="birthDate">تاريخ الميلاد</Label>
-          <Input id="birthDate" type="date" {...register("birthDate")} error={!!errors.birthDate} />
+          <Input id="birthDate" type="date" {...register("birthDate")} />
         </div>
         <div>
           <Label htmlFor="school">المدرسة</Label>
-          <Input id="school" {...register("school")} error={!!errors.school} placeholder="اسم المدرسة" />
+          <Input id="school" {...register("school")} placeholder="اسم المدرسة" />
         </div>
       </div>
 
       <div>
         <Label htmlFor="address">العنوان</Label>
-        <Textarea id="address" rows={2} {...register("address")} error={!!errors.address} placeholder="العنوان بالتفصيل" />
+        <Textarea id="address" rows={2} {...register("address")} placeholder="العنوان بالتفصيل" />
       </div>
 
       <div>
@@ -154,7 +158,7 @@ export function MemberForm({
 
       <div className="flex justify-end gap-2 pt-2">
         <Button type="submit" loading={isSubmitting}>
-          {member ? "حفظ التعديلات" : "إضافة المخدوم"}
+          {enrollmentId ? "حفظ التعديلات" : "إضافة المخدوم"}
         </Button>
       </div>
     </form>

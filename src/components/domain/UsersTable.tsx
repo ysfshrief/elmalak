@@ -11,32 +11,46 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/States";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
-import { UserForm } from "@/components/domain/UserForm";
-import { ROLE_LABELS } from "@/lib/roles";
+import { UserForm, type ScopeTree } from "@/components/domain/UserForm";
+import { roleLabel } from "@/lib/roles";
 import { deleteUserAction, toggleUserActiveAction } from "@/actions/users";
-import type { Role } from "@prisma/client";
+import type { Role, Gender } from "@prisma/client";
 
-type UserRow = {
+export type UserRow = {
   id: string;
   name: string;
   username: string;
   phone: string | null;
   role: Role;
+  gender: Gender | null;
   isActive: boolean;
-  stageId: string | null;
-  stage: { name: string } | null;
-  assignments: { familyId: string; family: { name: string } }[];
+  assignments: {
+    serviceId: string | null;
+    stageId: string | null;
+    divisionId: string | null;
+    gradeId: string | null;
+    service: { name: string } | null;
+    stage: { name: string } | null;
+    division: { name: string; stage: { name: string } } | null;
+    grade: { name: string; division: { name: string; stage: { name: string } } } | null;
+  }[];
 };
+
+function scopeLabel(a: UserRow["assignments"][number]) {
+  if (a.service) return `الخدمة كلها`;
+  if (a.stage) return `مرحلة ${a.stage.name}`;
+  if (a.division) return `${a.division.stage.name} › ${a.division.name}`;
+  if (a.grade) return `${a.grade.division.stage.name} › ${a.grade.division.name} › ${a.grade.name}`;
+  return "بدون نطاق";
+}
 
 export function UsersTable({
   users,
-  stages,
-  families,
+  tree,
   currentUserId,
 }: {
   users: UserRow[];
-  stages: { id: string; name: string }[];
-  families: { id: string; name: string }[];
+  tree: ScopeTree;
   currentUserId: string;
 }) {
   const router = useRouter();
@@ -44,7 +58,7 @@ export function UsersTable({
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editUser, setEditUser] = React.useState<UserRow | null>(null);
   const [deleteUser, setDeleteUser] = React.useState<UserRow | null>(null);
-  const [deleting, setDeleting] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
 
   const filtered = React.useMemo(() => {
     const q = query.trim();
@@ -70,7 +84,7 @@ export function UsersTable({
 
   async function handleDelete() {
     if (!deleteUser) return;
-    setDeleting(true);
+    setBusy(true);
     try {
       await deleteUserAction(deleteUser.id);
       toast.success("تم حذف المستخدم");
@@ -79,14 +93,19 @@ export function UsersTable({
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "تعذر الحذف");
     } finally {
-      setDeleting(false);
+      setBusy(false);
     }
   }
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <SearchInput value={query} onChange={setQuery} placeholder="ابحث بالاسم أو اسم المستخدم..." className="sm:max-w-xs" />
+        <SearchInput
+          value={query}
+          onChange={setQuery}
+          placeholder="ابحث بالاسم أو اسم المستخدم..."
+          className="sm:max-w-xs"
+        />
         <Button onClick={() => setCreateOpen(true)}>
           <Plus className="size-4.5" />
           مستخدم جديد
@@ -104,7 +123,7 @@ export function UsersTable({
             >
               <div className="flex items-center gap-3">
                 <Avatar name={u.name} />
-                <div>
+                <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <p className="font-bold text-ink">{u.name}</p>
                     {!u.isActive && <Badge tone="neutral">معطّل</Badge>}
@@ -113,11 +132,10 @@ export function UsersTable({
                     @{u.username}
                   </p>
                   <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    <Badge tone="primary">{ROLE_LABELS[u.role]}</Badge>
-                    {u.stage && <Badge tone="secondary">{u.stage.name}</Badge>}
-                    {u.assignments.map((a) => (
-                      <Badge key={a.familyId} tone="secondary">
-                        {a.family.name}
+                    <Badge tone="primary">{roleLabel(u.role, u.gender)}</Badge>
+                    {u.assignments.map((a, i) => (
+                      <Badge key={i} tone="secondary">
+                        {scopeLabel(a)}
                       </Badge>
                     ))}
                   </div>
@@ -141,27 +159,12 @@ export function UsersTable({
         </ul>
       )}
 
-      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="مستخدم جديد">
-        <UserForm stages={stages} families={families} onSuccess={refresh} />
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="مستخدم جديد" size="lg">
+        <UserForm tree={tree} onSuccess={refresh} />
       </Modal>
 
-      <Modal open={!!editUser} onClose={() => setEditUser(null)} title="تعديل المستخدم">
-        {editUser && (
-          <UserForm
-            stages={stages}
-            families={families}
-            user={{
-              id: editUser.id,
-              name: editUser.name,
-              username: editUser.username,
-              phone: editUser.phone,
-              role: editUser.role,
-              stageId: editUser.stageId,
-              assignments: editUser.assignments,
-            }}
-            onSuccess={refresh}
-          />
-        )}
+      <Modal open={!!editUser} onClose={() => setEditUser(null)} title="تعديل المستخدم" size="lg">
+        {editUser && <UserForm tree={tree} user={editUser} onSuccess={refresh} />}
       </Modal>
 
       <ConfirmDialog
@@ -170,7 +173,7 @@ export function UsersTable({
         title="حذف المستخدم"
         description={deleteUser ? `هل أنت متأكد من حذف حساب "${deleteUser.name}"؟` : ""}
         confirmLabel="حذف نهائيًا"
-        loading={deleting}
+        loading={busy}
         onConfirm={handleDelete}
       />
     </div>

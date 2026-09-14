@@ -3,11 +3,11 @@
 import * as React from "react";
 import { LogOut, ChevronDown } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
-import { ROLE_LABELS } from "@/lib/roles";
+import { roleLabel } from "@/lib/roles";
 import { logoutAction } from "@/actions/auth";
-import type { Role } from "@prisma/client";
+import type { Role, Gender } from "@prisma/client";
 
-export function UserMenu({ name, role }: { name: string; role: Role }) {
+export function UserMenu({ name, role, gender }: { name: string; role: Role; gender: Gender | null }) {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
 
@@ -30,7 +30,7 @@ export function UserMenu({ name, role }: { name: string; role: Role }) {
         <Avatar name={name} size="sm" />
         <span className="hidden sm:block text-right">
           <span className="block text-sm font-semibold text-ink leading-tight">{name}</span>
-          <span className="block text-xs text-ink-faint leading-tight">{ROLE_LABELS[role]}</span>
+          <span className="block text-xs text-ink-faint leading-tight">{roleLabel(role, gender)}</span>
         </span>
         <ChevronDown className="hidden sm:block size-4 text-ink-faint" />
       </button>
@@ -42,7 +42,7 @@ export function UserMenu({ name, role }: { name: string; role: Role }) {
         >
           <div className="border-b border-border px-3.5 py-3 sm:hidden">
             <p className="text-sm font-semibold text-ink">{name}</p>
-            <p className="text-xs text-ink-faint">{ROLE_LABELS[role]}</p>
+            <p className="text-xs text-ink-faint">{roleLabel(role, gender)}</p>
           </div>
           <form action={logoutAction}>
             <button

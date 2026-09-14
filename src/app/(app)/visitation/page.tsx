@@ -1,54 +1,25 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { HeartHandshake, ChevronLeft, Users } from "lucide-react";
 import { requireUser } from "@/lib/auth";
-import { getAccessibleFamilies } from "@/lib/queries";
-import { EmptyState } from "@/components/ui/States";
-import { Badge } from "@/components/ui/Badge";
+import { getVisibleHierarchy } from "@/lib/queries";
+import { HierarchyBrowser } from "@/components/domain/HierarchyBrowser";
 
 export const metadata: Metadata = { title: "الافتقاد" };
 
 export default async function VisitationIndexPage() {
   const user = await requireUser();
-  const families = await getAccessibleFamilies(user);
+  const stages = await getVisibleHierarchy(user);
 
-  if (families.length === 1) {
-    redirect(`/visitation/${families[0]!.id}`);
-  }
+  const grades = stages.flatMap((s) => s.divisions.flatMap((d) => d.grades));
+  if (grades.length === 1) redirect(`/visitation/${grades[0]!.id}`);
 
   return (
     <div className="space-y-6">
       <div className="animate-fade-in-up">
         <h1 className="text-2xl font-extrabold text-ink">الافتقاد</h1>
-        <p className="mt-1 text-sm text-ink-muted">اختر الأسرة لمتابعة افتقاد المخدومين</p>
+        <p className="mt-1 text-sm text-ink-muted">اختر الصف لمتابعة افتقاد مخدوميه</p>
       </div>
-
-      {families.length === 0 ? (
-        <EmptyState icon={HeartHandshake} title="لا توجد أسر متاحة" description="لم يتم تعيينك على أي أسرة بعد" />
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {families.map((f) => (
-            <Link
-              key={f.id}
-              href={`/visitation/${f.id}`}
-              className="group flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-border bg-surface p-4 shadow-[var(--shadow-sm)] transition-all hover:border-primary/40 hover:shadow-[var(--shadow-md)] active:scale-[0.99]"
-            >
-              <div className="min-w-0">
-                <p className="truncate font-bold text-ink">{f.name}</p>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <Badge tone="primary">{f.stage.name}</Badge>
-                  <span className="flex items-center gap-1 text-xs text-ink-faint">
-                    <Users className="size-3.5" />
-                    {f._count.members}
-                  </span>
-                </div>
-              </div>
-              <ChevronLeft className="size-5 shrink-0 text-ink-faint transition-transform group-hover:-translate-x-0.5" />
-            </Link>
-          ))}
-        </div>
-      )}
+      <HierarchyBrowser stages={stages} basePath="/visitation" />
     </div>
   );
 }

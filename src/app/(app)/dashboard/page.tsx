@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Users, ClipboardCheck, HeartHandshake, Cake, UserPlus } from "lucide-react";
+import { Users, ClipboardCheck, HeartHandshake, Cake, UserPlus, Network } from "lucide-react";
 import { requireUser } from "@/lib/auth";
-import { getDashboardData, getAccessibleFamilies } from "@/lib/queries";
+import { getDashboardData, getVisibleHierarchy } from "@/lib/queries";
+import { roleLabel } from "@/lib/roles";
 import { StatCard } from "@/components/ui/StatCard";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/States";
@@ -13,28 +14,31 @@ import { formatArabicDate } from "@/lib/utils";
 export const metadata: Metadata = { title: "الرئيسية" };
 
 function greeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "صباح الخير";
-  if (hour < 17) return "مساء الخير";
-  return "مساء الخير";
+  return new Date().getHours() < 12 ? "صباح الخير" : "مساء الخير";
 }
 
 export default async function DashboardPage() {
   const user = await requireUser();
-  const [data, families] = await Promise.all([getDashboardData(user), getAccessibleFamilies(user)]);
+  const [data, stages] = await Promise.all([getDashboardData(user), getVisibleHierarchy(user)]);
 
-  const singleFamily = families.length === 1 ? families[0] : null;
+  const grades = stages.flatMap((s) => s.divisions.flatMap((d) => d.grades));
+  const singleGrade = grades.length === 1 ? grades[0]! : null;
 
   return (
     <div className="space-y-6">
       <div className="animate-fade-in-up">
-        <h1 className="text-2xl font-extrabold text-ink">{greeting()}، {user.name.split(" ")[0]} 👋</h1>
-        <p className="mt-1 text-sm text-ink-muted">نظرة سريعة على خدمة التربية الكنسية اليوم</p>
+        <h1 className="text-2xl font-extrabold text-ink">
+          {greeting()}، {user.name.split(" ")[0]} 👋
+        </h1>
+        <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-muted">
+          <Badge tone="primary">{roleLabel(user.role, user.gender)}</Badge>
+          {data.academicYear && <Badge tone="secondary">سنة {data.academicYear.name}</Badge>}
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <StatCard icon={Users} label="عدد الأسر" value={data.familyCount} tone="primary" />
-        <StatCard icon={Users} label="عدد المخدومين" value={data.memberCount} tone="secondary" />
+        <StatCard icon={Network} label="الصفوف في نطاقك" value={data.gradeCount} tone="primary" />
+        <StatCard icon={Users} label="عدد المخدومين" value={data.childCount} tone="secondary" />
         <StatCard
           icon={ClipboardCheck}
           label="نسبة الحضور هذا الشهر"
@@ -55,16 +59,20 @@ export default async function DashboardPage() {
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <QuickAction
-            href={singleFamily ? `/attendance/${singleFamily.id}` : "/attendance"}
+            href={singleGrade ? `/attendance/${singleGrade.id}` : "/attendance"}
             icon={ClipboardCheck}
             label="تسجيل حضور"
           />
           <QuickAction
-            href={singleFamily ? `/visitation/${singleFamily.id}` : "/visitation"}
+            href={singleGrade ? `/visitation/${singleGrade.id}` : "/visitation"}
             icon={HeartHandshake}
             label="متابعة افتقاد"
           />
-          <QuickAction href="/families" icon={UserPlus} label="إضافة مخدوم" />
+          <QuickAction
+            href={singleGrade ? `/grades/${singleGrade.id}` : "/hierarchy"}
+            icon={UserPlus}
+            label="المخدومون"
+          />
           <QuickAction href="/birthdays" icon={Cake} label="أعياد الميلاد" />
         </CardContent>
       </Card>
@@ -82,12 +90,12 @@ export default async function DashboardPage() {
               <EmptyState icon={Cake} title="لا توجد أعياد ميلاد قريبة" description="خلال الـ30 يومًا القادمة" />
             ) : (
               <ul className="divide-y divide-border">
-                {data.upcomingBirthdays.map(({ member, days }) => (
-                  <li key={member.id} className="flex items-center gap-3 py-3">
-                    <Avatar name={member.fullName} size="sm" />
+                {data.upcomingBirthdays.map(({ enrollment, child, days }) => (
+                  <li key={enrollment.id} className="flex items-center gap-3 py-3">
+                    <Avatar name={child.fullName} size="sm" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-ink">{member.fullName}</p>
-                      <p className="text-xs text-ink-faint">{formatArabicDate(member.birthDate)}</p>
+                      <p className="truncate text-sm font-semibold text-ink">{child.fullName}</p>
+                      <p className="text-xs text-ink-faint">{formatArabicDate(child.birthDate)}</p>
                     </div>
                     <Badge tone={days === 0 ? "success" : "neutral"}>
                       {days === 0 ? "اليوم 🎉" : days === 1 ? "غدًا" : `بعد ${days} يوم`}
@@ -105,17 +113,26 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             {data.recentActivity.length === 0 ? (
-              <EmptyState icon={ClipboardCheck} title="لا يوجد نشاط بعد" description="ستظهر هنا آخر عمليات الحضور والمخدومين الجدد" />
+              <EmptyState
+                icon={ClipboardCheck}
+                title="لا يوجد نشاط بعد"
+                description="ستظهر هنا آخر عمليات الحضور والمخدومين الجدد"
+              />
             ) : (
               <ul className="divide-y divide-border">
                 {data.recentActivity.map((item) => (
                   <li key={`${item.type}-${item.id}`} className="flex items-start gap-3 py-3">
                     <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-bg-alt text-ink-muted">
-                      {item.type === "attendance" ? <ClipboardCheck className="size-4" /> : <UserPlus className="size-4" />}
+                      {item.type === "attendance" ? (
+                        <ClipboardCheck className="size-4" />
+                      ) : (
+                        <UserPlus className="size-4" />
+                      )}
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm text-ink">
-                        {item.type === "attendance" ? "تسجيل حضور" : "مخدوم جديد"} — <span className="font-semibold">{item.familyName}</span>
+                        {item.type === "attendance" ? "تسجيل حضور" : "مخدوم جديد"} —{" "}
+                        <span className="font-semibold">{item.where}</span>
                       </p>
                       <p className="text-xs text-ink-faint">{item.meta}</p>
                     </div>
@@ -130,7 +147,15 @@ export default async function DashboardPage() {
   );
 }
 
-function QuickAction({ href, icon: Icon, label }: { href: string; icon: React.ComponentType<{ className?: string }>; label: string }) {
+function QuickAction({
+  href,
+  icon: Icon,
+  label,
+}: {
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+}) {
   return (
     <Link
       href={href}
