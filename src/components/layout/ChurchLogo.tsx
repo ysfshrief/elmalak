@@ -1,11 +1,15 @@
-/**
- * Vector recreation of the church's badge logo (shape, Arabic text and gold
- * palette reproduced from the source image; the center devotional icon is
- * simplified rather than redrawn — see README "الهوية البصرية").
- */
-export function ChurchLogo({ className }: { className?: string }) {
+import Image from "next/image";
+
+/** The church's own badge logo, background removed (source in assets/logos/). */
+export function ChurchLogo({ className, size = 128 }: { className?: string; size?: number }) {
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- fixed-size local SVG, no responsive/optimization benefit from next/image
-    <img src="/logos/church-logo.svg" alt="شعار كنيسة رئيس الملائكة الجليل ميخائيل بدمنهور" className={className} />
+    <Image
+      src="/logos/church-logo.png"
+      alt="شعار كنيسة رئيس الملائكة الجليل ميخائيل بدمنهور"
+      width={size}
+      height={size}
+      className={className}
+      priority
+    />
   );
 }

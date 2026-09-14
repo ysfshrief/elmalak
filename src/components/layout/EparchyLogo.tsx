@@ -1,16 +1,18 @@
+import Image from "next/image";
+import { cn } from "@/lib/utils";
+
 /**
- * Vector recreation of the eparchy's mark (cross + Arabic name reproduced
- * from the source image). The small Coptic-script caption above the cross
- * in the original is omitted here rather than risk a mistranscribed
- * liturgical text — see README "الهوية البصرية".
+ * The eparchy's mark, background removed (source in assets/logos/).
+ * It is pure black ink, so it is inverted to white in dark mode.
  */
 export function EparchyLogo({ className }: { className?: string }) {
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- fixed-size local SVG, no responsive/optimization benefit from next/image
-    <img
-      src="/logos/eparchy-logo.svg"
+    <Image
+      src="/logos/eparchy-logo.png"
       alt="شعار مطرانية البحيرة وتوابعها للأقباط الأرثوذكس"
-      className={className}
+      width={400}
+      height={302}
+      className={cn("eparchy-mark", className)}
     />
   );
 }
