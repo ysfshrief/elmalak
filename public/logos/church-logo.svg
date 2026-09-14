@@ -2,6 +2,9 @@
   <title>كنيسة رئيس الملائكة الجليل ميخائيل بدمنهور</title>
   <defs>
     <path id="petal" d="M 0,-119 C 33,-119 47,-89 47,-61 C 47,-42 41,-31 31,-25 L 31,9 L -31,9 L -31,-25 C -41,-31 -47,-42 -47,-61 C -47,-89 -33,-119 0,-119 Z" />
+    <clipPath id="medallionClip">
+      <circle r="50" />
+    </clipPath>
   </defs>
   <g transform="translate(120,120)">
     <!-- 4 petals (beaded gold border, cream fill) -->
@@ -22,16 +25,49 @@
     <circle r="60" fill="#FBF7EC" stroke="#AB8324" stroke-width="3.5" />
     <circle r="53" fill="none" stroke="#C9A646" stroke-width="2" stroke-dasharray="0.2 6" stroke-linecap="round" />
 
-    <!-- simplified emblem (placeholder for the painted icon of the Archangel — see README) -->
-    <g stroke="#AB8324" stroke-width="7" stroke-linecap="round">
-      <line x1="0" y1="-30" x2="0" y2="30" />
-      <line x1="-22" y1="-6" x2="22" y2="-6" />
-    </g>
-    <g fill="#AB8324" stroke="none">
-      <circle cx="0" cy="-30" r="6" />
-      <circle cx="0" cy="30" r="6" />
-      <circle cx="-22" cy="-6" r="6" />
-      <circle cx="22" cy="-6" r="6" />
+    <!-- stylised emblem: Archangel Michael with sword and scales over the
+         vanquished adversary — an original flat-icon recreation of the
+         traditional composition seen in the source artwork, not a trace
+         of it (see README "الهوية البصرية") -->
+    <g clip-path="url(#medallionClip)">
+      <circle r="50" fill="#E4E7D6" />
+
+      <!-- vanquished figure, ground level -->
+      <g fill="#4A372E">
+        <ellipse cx="10" cy="34" rx="15" ry="7" />
+        <path d="M -2,34 C -8,26 -6,18 2,16 C 6,20 6,28 2,34 Z" />
+        <path d="M 0,18 L -6,10 M 2,16 L 10,10" stroke="#4A372E" stroke-width="2.5" stroke-linecap="round" />
+      </g>
+
+      <!-- wings -->
+      <path d="M -6,-14 C -22,-30 -44,-28 -46,-6 C -34,-10 -22,-6 -12,6 Z" fill="#D8C27E" stroke="#AB8324" stroke-width="1.5" />
+      <path d="M 8,-16 C 24,-32 46,-28 47,-6 C 35,-11 23,-7 13,5 Z" fill="#D8C27E" stroke="#AB8324" stroke-width="1.5" />
+
+      <!-- cloak -->
+      <path d="M -14,-14 C -24,0 -22,20 -10,30 L 6,26 C -2,14 -4,-2 4,-14 Z" fill="#A8402F" />
+
+      <!-- tunic / legs -->
+      <path d="M -9,-6 C -12,8 -10,22 -4,30 L 12,28 C 14,16 12,2 7,-8 Z" fill="#4B6B4E" />
+      <rect x="-9" y="8" width="20" height="4.5" rx="2" fill="#C9A646" />
+
+      <!-- raised arm + sword -->
+      <path d="M 5,-10 C 10,-18 14,-24 12,-32" stroke="#E8B98A" stroke-width="5.5" stroke-linecap="round" fill="none" />
+      <path d="M 12,-32 L 20,-42" stroke="#B9B9B9" stroke-width="3" stroke-linecap="round" />
+      <path d="M 9,-33 L 15,-31" stroke="#AB8324" stroke-width="2.5" stroke-linecap="round" />
+
+      <!-- extended arm + scales (simplified for legibility at small sizes) -->
+      <path d="M -8,-6 C -15,-2 -19,3 -19,9" stroke="#E8B98A" stroke-width="5" stroke-linecap="round" fill="none" />
+      <g stroke="#AB8324" stroke-width="1.8" fill="none" stroke-linecap="round">
+        <line x1="-19" y1="9" x2="-19" y2="16" />
+        <line x1="-26" y1="14" x2="-12" y2="14" />
+      </g>
+      <circle cx="-26" cy="17" r="2.6" fill="#AB8324" />
+      <circle cx="-12" cy="17" r="2.6" fill="#AB8324" />
+
+      <!-- head + halo -->
+      <circle cx="1" cy="-19" r="13" fill="#EFDFAE" stroke="#AB8324" stroke-width="1.5" />
+      <circle cx="1" cy="-19" r="8.5" fill="#E8B98A" />
+      <path d="M -6,-25 C -3,-30 6,-30 8,-24 C 4,-27 -2,-27 -6,-25 Z" fill="#8B5A2B" />
     </g>
 
     <!-- petal labels -->
