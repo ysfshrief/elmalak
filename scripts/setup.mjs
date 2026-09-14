@@ -11,6 +11,7 @@ import { dirname, join } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const envPath = join(root, ".env");
+const PLACEHOLDER = "postgresql://USER:PASSWORD@HOST:5432/DATABASE?schema=public";
 
 function run(command) {
   execSync(command, { cwd: root, stdio: "inherit" });
@@ -19,24 +20,43 @@ function run(command) {
 if (!existsSync(envPath)) {
   writeFileSync(
     envPath,
-    `DATABASE_URL="file:./dev.db"\nAUTH_SECRET="${randomBytes(32).toString("hex")}"\n`
+    `DATABASE_URL="${PLACEHOLDER}"\nAUTH_SECRET="${randomBytes(32).toString("hex")}"\n`
   );
   console.log("✓ تم إنشاء ملف .env بمفتاح AUTH_SECRET عشوائي");
-} else {
-  const env = readFileSync(envPath, "utf8");
-  const missing = ["DATABASE_URL", "AUTH_SECRET"].filter((key) => !new RegExp(`^${key}=`, "m").test(env));
-  if (missing.length > 0) {
-    console.error(`✗ ملف .env موجود لكن ينقصه: ${missing.join(", ")}`);
-    process.exit(1);
-  }
-  console.log("✓ ملف .env موجود");
+}
+
+const env = readFileSync(envPath, "utf8");
+const missing = ["DATABASE_URL", "AUTH_SECRET"].filter(
+  (key) => !new RegExp(`^${key}=`, "m").test(env)
+);
+if (missing.length > 0) {
+  console.error(`✗ ملف .env ينقصه: ${missing.join(", ")}`);
+  process.exit(1);
+}
+
+if (env.includes(PLACEHOLDER)) {
+  console.error(
+    [
+      "",
+      "✗ لم يتم ضبط DATABASE_URL بعد.",
+      "",
+      "  المشروع يستخدم PostgreSQL. افتح ملف .env وضع رابط قاعدة بياناتك مكان العنوان المؤقت.",
+      "  للتشغيل المحلي بقاعدة بيانات على جهازك:",
+      "",
+      '    DATABASE_URL="postgresql://postgres:postgres@localhost:5432/elmalak?schema=public"',
+      "",
+      "  أو استخدم نفس رابط قاعدة البيانات المستضافة المستخدمة في الإنتاج.",
+      "",
+    ].join("\n")
+  );
+  process.exit(1);
 }
 
 console.log("→ تطبيق ترحيلات قاعدة البيانات...");
 run("npx prisma migrate deploy");
 run("npx prisma generate");
 
-console.log("→ تعبئة البيانات الأولية (تتخطى الموجود مسبقًا)...");
+console.log("→ تعبئة البيانات الأولية (تعمل مرة واحدة فقط على قاعدة بيانات فارغة)...");
 run("npx prisma db seed");
 
 console.log("\n✓ جاهز. شغّل التطبيق بـ: npm run dev");

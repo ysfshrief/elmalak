@@ -206,6 +206,15 @@ const MEMBERS = [
 ];
 
 async function main() {
+  // First-run bootstrap only. The seed runs on every deploy, so once the
+  // service is actually using the app we must not resurrect records the
+  // servants have since edited or deleted.
+  const existingUsers = await prisma.user.count();
+  if (existingUsers > 0) {
+    console.log("قاعدة البيانات مُهيّأة بالفعل — تخطّي التعبئة الأولية.");
+    return;
+  }
+
   console.log("بدء تجهيز البيانات الأولية...");
 
   const stage = await prisma.stage.upsert({
