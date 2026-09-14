@@ -1,0 +1,341 @@
+/**
+ * تحويل جدول خام (صفوف من نصوص) إلى صفوف مخدومين جاهزة للمراجعة.
+ *
+ * كل ما هنا نقيٌّ وبلا اعتماد على بيئة — يعمل على الخادم وفي المتصفّح،
+ * فتظهر للمستخدم نفس النتيجة التي سيحفظها الخادم لاحقًا.
+ */
+import {
+  COLUMNS,
+  PHONE_COLUMNS,
+  PHONE_LABELS,
+  type ColumnKey,
+} from "./columns";
+
+/* ————————————————————————— أدوات نصية ————————————————————————— */
+
+const ARABIC_INDIC = "٠١٢٣٤٥٦٧٨٩";
+const EASTERN_ARABIC_INDIC = "۰۱۲۳۴۵۶۷۸۹";
+
+/** يحوّل الأرقام العربية والفارسية إلى أرقام لاتينية. */
+export function toLatinDigits(input: string) {
+  return input.replace(/[٠-٩۰-۹]/g, (d) => {
+    const ai = ARABIC_INDIC.indexOf(d);
+    if (ai >= 0) return String(ai);
+    return String(EASTERN_ARABIC_INDIC.indexOf(d));
+  });
+}
+
+/**
+ * يوحّد الكتابة العربية لأغراض المقارنة فقط: يحذف التشكيل والتطويل،
+ * ويوحّد الألف والياء والتاء المربوطة، ويزيل المسافات وعلامات الترقيم.
+ */
+export function normalizeArabic(input: string) {
+  return toLatinDigits(String(input ?? ""))
+    .replace(/[ً-ٰٟـ]/g, "")
+    .replace(/[إأآٱ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ؤ/g, "و")
+    .replace(/ئ/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/[^\p{L}\p{N}]/gu, "")
+    .toLowerCase()
+    .trim();
+}
+
+/**
+ * محارف اتجاه وتنسيق غير مرئية تدسّها القراءة الضوئية ومحرّرات النصوص في
+ * النصوص المختلطة. لا معنى لها داخل اسم أو رقم، وتفسد البحث والمقارنة، فتُحذف.
+ */
+const INVISIBLE = /[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
+
+/** تنظيف قيمة خلية للعرض: بلا محارف خفيّة، ومسافات مضغوطة. */
+export function cleanCell(value: unknown): string {
+  if (value == null) return "";
+  if (value instanceof Date) return toISODate(value) ?? "";
+  return String(value).replace(INVISIBLE, "").replace(/\s+/g, " ").trim();
+}
+
+/* ————————————————————————— مطابقة العناوين ————————————————————————— */
+
+const HEADER_INDEX = new Map<string, ColumnKey>();
+for (const col of COLUMNS) {
+  for (const label of [col.header, ...col.aliases]) {
+    HEADER_INDEX.set(normalizeArabic(label), col.key);
+  }
+}
+// تسميات شائعة إضافية لا تستحق عمودًا في القالب.
+for (const [label, key] of [
+  ["م", null],
+  ["مسلسل", null],
+] as const) {
+  if (key === null) HEADER_INDEX.set(normalizeArabic(label), "__skip" as ColumnKey);
+}
+
+/**
+ * بدايات تدل على سطر تذييل («إجمالي: ٢٠») لا على اسم مخدوم. لا يبدأ بها
+ * اسم عربي، فإسقاطها آمن.
+ */
+const SUMMARY_PREFIXES = ["اجمالي", "الاجمالي", "المجموع", "مجموع", "العدد", "عدد", "الاجماليات"];
+
+export function isSummaryRow(name: string) {
+  const key = normalizeArabic(name);
+  return SUMMARY_PREFIXES.some((prefix) => key.startsWith(prefix));
+}
+
+export function matchColumn(header: string): ColumnKey | null {
+  const key = HEADER_INDEX.get(normalizeArabic(header));
+  return key && key !== ("__skip" as ColumnKey) ? key : null;
+}
+
+/** أفضل صف عناوين في الجدول: الصف الذي يطابق أكبر عدد من الأعمدة المعروفة. */
+export function findHeaderRow(table: string[][]): { index: number; matched: number } {
+  let best = { index: -1, matched: 0 };
+  const limit = Math.min(table.length, 15);
+  for (let i = 0; i < limit; i++) {
+    const matched = new Set(table[i].map(matchColumn).filter(Boolean)).size;
+    if (matched > best.matched) best = { index: i, matched };
+  }
+  return best;
+}
+
+/* ————————————————————————— محلّلات القيم ————————————————————————— */
+
+export function toISODate(date: Date): string | null {
+  if (Number.isNaN(date.getTime())) return null;
+  const y = date.getUTCFullYear();
+  if (y < 1900 || y > 2200) return null;
+  return `${y}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(
+    date.getUTCDate()
+  ).padStart(2, "0")}`;
+}
+
+/**
+ * يقبل: كائن Date، ورقم Excel التسلسلي، و«يوم/شهر/سنة» بأي فاصل،
+ * و«سنة-شهر-يوم». الترتيب المصري (يوم أولًا) هو الافتراض عند الالتباس.
+ */
+export function parseDateValue(value: unknown): { iso: string | null; error?: string } {
+  if (value == null || value === "") return { iso: null };
+  if (value instanceof Date) return { iso: toISODate(value) };
+
+  const raw = toLatinDigits(String(value)).trim();
+  if (!raw) return { iso: null };
+
+  // رقم Excel التسلسلي (المرجع 1899-12-30).
+  if (/^\d{5}$/.test(raw)) {
+    const serial = Number(raw);
+    if (serial > 0 && serial < 80000) {
+      return { iso: toISODate(new Date(Date.UTC(1899, 11, 30) + serial * 86400000)) };
+    }
+  }
+
+  const parts = raw.split(/[^\d]+/).filter(Boolean).map(Number);
+  if (parts.length < 3) return { iso: null, error: "تاريخ غير مفهوم" };
+
+  const [a, b, c] = parts;
+  let day: number, month: number, year: number;
+  if (a > 31) {
+    [year, month, day] = [a, b, c];
+  } else {
+    [day, month, year] = [a, b, c];
+    // 12/5 مقبولان في الاتجاهين؛ إن تجاوز «اليوم» ١٢ والشهر لا، فالترتيب مقلوب.
+    if (day <= 12 && month > 12) [day, month] = [month, day];
+  }
+  if (year < 100) year += year > 30 ? 1900 : 2000;
+
+  if (month < 1 || month > 12 || day < 1 || day > 31) {
+    return { iso: null, error: "تاريخ غير صحيح" };
+  }
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCMonth() !== month - 1) return { iso: null, error: "تاريخ غير صحيح" };
+  const iso = toISODate(date);
+  return iso ? { iso } : { iso: null, error: "تاريخ خارج المدى المعقول" };
+}
+
+const MALE_WORDS = new Set(["ذكر", "ولد", "بنين", "م", "male", "m", "ذ"].map(normalizeArabic));
+const FEMALE_WORDS = new Set(
+  ["انثي", "أنثى", "بنت", "بنات", "female", "f", "ث", "انثى"].map(normalizeArabic)
+);
+
+export function parseGenderValue(value: unknown): "MALE" | "FEMALE" | "" {
+  const key = normalizeArabic(cleanCell(value));
+  if (!key) return "";
+  if (MALE_WORDS.has(key)) return "MALE";
+  if (FEMALE_WORDS.has(key)) return "FEMALE";
+  return "";
+}
+
+/** يستخلص رقمًا صالحًا أو يعيد خطأً — لا يُخمّن ولا يُصلح. */
+export function parsePhoneValue(value: unknown): { number: string | null; error?: string } {
+  const raw = toLatinDigits(cleanCell(value));
+  if (!raw) return { number: null };
+  const cleaned = raw.replace(/[^\d+]/g, "");
+  const digits = cleaned.replace(/\D/g, "");
+  if (digits.length < 7) return { number: null, error: `رقم قصير: «${raw}»` };
+  if (digits.length > 15) return { number: null, error: `رقم طويل: «${raw}»` };
+  return { number: cleaned };
+}
+
+export function parsePhoneLabel(value: unknown, fallback: string): string {
+  const key = normalizeArabic(cleanCell(value));
+  if (!key) return fallback;
+  const match = PHONE_LABELS.find((l) => normalizeArabic(l) === key);
+  if (match) return match;
+  // تسميات حرّة مقبولة كما هي (مثل «الجد») ما دامت قصيرة.
+  const raw = cleanCell(value);
+  return raw.length <= 20 ? raw : fallback;
+}
+
+/* ————————————————————————— الصف الناتج ————————————————————————— */
+
+export type ImportPhone = { label: string; number: string };
+
+export type ImportRow = {
+  /** معرّف محلّي ثابت أثناء المراجعة (ليس معرّف قاعدة بيانات). */
+  key: string;
+  sourceRow: number;
+  fullName: string;
+  gradeId: string;
+  gender: "MALE" | "FEMALE" | "";
+  birthDate: string;
+  school: string;
+  confessionFather: string;
+  address: string;
+  notes: string;
+  phones: ImportPhone[];
+  /** رسائل تحذير من القراءة (قيمة غير مفهومة، صف غير معروف...). */
+  warnings: string[];
+};
+
+export type GradeOption = { id: string; path: string; label: string };
+
+/** يبني فهرسًا يطابق نص الصف المكتوب في الملف بمعرّف الصف الحقيقي. */
+export function buildGradeIndex(grades: GradeOption[]) {
+  const index = new Map<string, string>();
+  for (const grade of grades) {
+    index.set(normalizeArabic(grade.path), grade.id);
+    // «إعدادي › بنين › الصف الأول» يُطابَق أيضًا بـ«الصف الأول إعدادي بنين»
+    // وبأي ترتيب آخر لأن المقارنة تتم بعد إزالة الفواصل والمسافات.
+    index.set(normalizeArabic(grade.path.split("›").reverse().join(" ")), grade.id);
+  }
+  return index;
+}
+
+export function resolveGrade(
+  value: string,
+  index: Map<string, string>,
+  grades: GradeOption[]
+): string | null {
+  const key = normalizeArabic(value);
+  if (!key) return null;
+  const direct = index.get(key);
+  if (direct) return direct;
+  // مطابقة متساهلة: صفٌّ واحد فقط يحتوي النص المكتوب.
+  const candidates = grades.filter((g) => {
+    const path = normalizeArabic(g.path);
+    return path.includes(key) || key.includes(path);
+  });
+  return candidates.length === 1 ? candidates[0].id : null;
+}
+
+/**
+ * يحوّل جدولًا خامًا إلى صفوف. `defaultGradeId` يُستعمل حين لا يذكر الملف الصف.
+ */
+export function tableToRows(
+  table: string[][],
+  options: { defaultGradeId: string; grades: GradeOption[] }
+): { rows: ImportRow[]; headerRow: number; mapped: ColumnKey[]; ignoredHeaders: string[] } {
+  const { index: headerRow, matched } = findHeaderRow(table);
+  if (headerRow < 0 || matched === 0) {
+    return { rows: [], headerRow: -1, mapped: [], ignoredHeaders: [] };
+  }
+
+  const headers = table[headerRow];
+  const columnOf = new Map<number, ColumnKey>();
+  const ignoredHeaders: string[] = [];
+  const used = new Set<ColumnKey>();
+
+  headers.forEach((header, i) => {
+    const key = matchColumn(header);
+    if (!key) {
+      if (cleanCell(header)) ignoredHeaders.push(cleanCell(header));
+      return;
+    }
+    // عمود مكرّر؟ وجّهه إلى أول خانة تليفون فارغة بدل إسقاطه.
+    if (used.has(key)) {
+      const slot = PHONE_COLUMNS.find((p) => p.number === key);
+      if (slot) {
+        const free = PHONE_COLUMNS.find((p) => !used.has(p.number));
+        if (free) {
+          columnOf.set(i, free.number);
+          used.add(free.number);
+          return;
+        }
+      }
+      ignoredHeaders.push(cleanCell(header));
+      return;
+    }
+    columnOf.set(i, key);
+    used.add(key);
+  });
+
+  const gradeIndex = buildGradeIndex(options.grades);
+  const rows: ImportRow[] = [];
+
+  for (let r = headerRow + 1; r < table.length; r++) {
+    const cells = table[r];
+    const get = (key: ColumnKey) => {
+      for (const [i, k] of columnOf) if (k === key) return cleanCell(cells[i]);
+      return "";
+    };
+
+    const fullName = get("fullName");
+    // الصفوف الفارغة، وشظايا القراءة الضوئية، وسطور التذييل («الإجمالي: ٢٠»)
+    // ليست مخدومين.
+    if (!fullName) continue;
+    if ((fullName.match(/\p{L}/gu)?.length ?? 0) < 3) continue;
+    if (isSummaryRow(fullName)) continue;
+
+    const warnings: string[] = [];
+
+    const gradeText = get("gradePath");
+    let gradeId = options.defaultGradeId;
+    if (gradeText) {
+      const resolved = resolveGrade(gradeText, gradeIndex, options.grades);
+      if (resolved) gradeId = resolved;
+      else warnings.push(`الصف «${gradeText}» غير معروف — استُعمل الصف المحدَّد`);
+    }
+
+    const birth = parseDateValue(get("birthDate"));
+    if (birth.error) warnings.push(`${birth.error}: «${get("birthDate")}»`);
+
+    const phones: ImportPhone[] = [];
+    PHONE_COLUMNS.forEach((slot, i) => {
+      const parsed = parsePhoneValue(get(slot.number));
+      if (parsed.error) warnings.push(parsed.error);
+      if (!parsed.number) return;
+      const fallback = i === 0 ? "الأب" : "أخرى";
+      phones.push({ label: parsePhoneLabel(get(slot.label), fallback), number: parsed.number });
+    });
+
+    const genderText = get("gender");
+    const gender = parseGenderValue(genderText);
+    if (genderText && !gender) warnings.push(`النوع «${genderText}» غير مفهوم`);
+
+    rows.push({
+      key: `r${r}`,
+      sourceRow: r + 1,
+      fullName,
+      gradeId,
+      gender,
+      birthDate: birth.iso ?? "",
+      school: get("school"),
+      confessionFather: get("confessionFather"),
+      address: get("address"),
+      notes: get("notes"),
+      phones,
+      warnings,
+    });
+  }
+
+  return { rows, headerRow, mapped: [...used], ignoredHeaders };
+}

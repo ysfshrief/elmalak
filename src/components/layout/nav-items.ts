@@ -5,6 +5,7 @@ import {
   ClipboardCheck,
   HeartHandshake,
   Cake,
+  FileUp,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -23,6 +24,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/attendance", label: "الحضور والغياب", icon: ClipboardCheck, matchPrefix: true },
   { href: "/visitation", label: "الافتقاد", icon: HeartHandshake, matchPrefix: true },
   { href: "/birthdays", label: "أعياد الميلاد", icon: Cake },
+  { href: "/import", label: "استيراد كشف", icon: FileUp },
   {
     href: "/settings/users",
     label: "الإعدادات",

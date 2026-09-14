@@ -46,3 +46,9 @@ next-env.d.ts
 /prisma/dev.db-journal
 *.db
 *.db-journal
+
+# محرّك القراءة الضوئية يُنسخ من node_modules عند البناء (scripts/prepare-ocr.mjs)،
+# أمّا بيانات اللغة فليست جزءًا من أي حزمة فتُحفظ هنا.
+/public/ocr/*
+!/public/ocr/ara.traineddata
+!/public/ocr/eng.traineddata

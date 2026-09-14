@@ -345,3 +345,27 @@ export async function getFullHierarchy() {
     },
   });
 }
+
+/**
+ * الصفوف التي يستطيع المستخدم الاستيراد إليها، بمسارها الكامل — تُستعمل في
+ * قائمة اختيار الصف وفي القوائم المنسدلة داخل قالب الاستيراد.
+ */
+export async function getScopedGradeOptions(user: ScopedUser) {
+  const scope = await resolveScope(user);
+
+  const grades = await prisma.grade.findMany({
+    where: scope === "ALL" ? {} : { id: { in: scope } },
+    include: { division: { include: { stage: true } } },
+    orderBy: [
+      { division: { stage: { order: "asc" } } },
+      { division: { order: "asc" } },
+      { order: "asc" },
+    ],
+  });
+
+  return grades.map((grade) => ({
+    id: grade.id,
+    path: gradeTitle(grade),
+    label: grade.familyName ? `${gradeTitle(grade)} — ${grade.familyName}` : gradeTitle(grade),
+  }));
+}

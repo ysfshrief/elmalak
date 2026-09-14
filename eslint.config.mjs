@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // ملفات محرّك القراءة الضوئية مولَّدة ومنسوخة من node_modules.
+    "public/ocr/**",
   ]),
 ]);
 

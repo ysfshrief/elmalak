@@ -90,3 +90,23 @@ export const visitationUpdateSchema = z.object({
   visited: z.boolean(),
   note: z.string().trim().optional().or(z.literal("")),
 });
+
+/** صف واحد من كشف الاستيراد بعد مراجعة المستخدم وقبل الحفظ. */
+export const importRowSchema = z.object({
+  key: z.string().min(1),
+  fullName: z.string().trim().min(2, "اسم المخدوم مطلوب"),
+  gradeId: z.string().min(1, "اختر الصف"),
+  gender: z.enum(["MALE", "FEMALE"]).optional().or(z.literal("")),
+  birthDate: z.string().optional().or(z.literal("")),
+  school: z.string().trim().optional().or(z.literal("")),
+  confessionFather: z.string().trim().optional().or(z.literal("")),
+  address: z.string().trim().optional().or(z.literal("")),
+  notes: z.string().trim().optional().or(z.literal("")),
+  phones: z.array(phoneSchema),
+});
+
+export const importCommitSchema = z.object({
+  rows: z.array(importRowSchema).min(1, "لا توجد صفوف للحفظ"),
+  /** إضافة أسماء موجودة بالفعل في الصف نفسه هذا العام. */
+  allowDuplicates: z.boolean(),
+});
