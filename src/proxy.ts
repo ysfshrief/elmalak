@@ -25,6 +25,9 @@ export async function proxy(request: NextRequest) {
     PUBLIC_PATHS.some((p) => pathname === p) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/auth") ||
+    // ملفات محرّك القراءة الضوئية: برامج وبيانات لغة لا بيانات مخدومين،
+    // ويطلبها عاملُ الخلفية في المتصفّح فلا يُعتمد على وصول الكعكة إليه.
+    pathname.startsWith("/ocr/") ||
     pathname === "/favicon.ico";
 
   const authed = await hasValidSession(request);
@@ -47,5 +50,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|.*\\.(?:svg|png|jpg|jpeg|webp|ico)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|ocr/|.*\\.(?:svg|png|jpg|jpeg|webp|ico)$).*)"],
 };

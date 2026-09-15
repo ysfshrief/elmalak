@@ -1,8 +1,10 @@
 import { requireRole } from "@/lib/auth";
+import { buildInfo } from "@/lib/version";
 import { SettingsTabs } from "@/components/domain/SettingsTabs";
 
 export default async function SettingsLayout({ children }: { children: React.ReactNode }) {
   await requireRole(["ADMIN"]);
+  const build = buildInfo();
 
   return (
     <div className="space-y-6">
@@ -12,6 +14,16 @@ export default async function SettingsLayout({ children }: { children: React.Rea
       </div>
       <SettingsTabs />
       {children}
+      <p className="pt-2 text-center text-xs text-ink-faint">
+        إصدار الموقع: {build.commit}
+        {build.branch && ` — ${build.branch}`}
+        {build.message && (
+          <>
+            <br />
+            {build.message}
+          </>
+        )}
+      </p>
     </div>
   );
 }

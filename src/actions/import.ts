@@ -8,7 +8,7 @@ import { getCurrentAcademicYear, getScopedGradeOptions } from "@/lib/queries";
 import { importCommitSchema } from "@/lib/validation";
 import { parseImportFile, MAX_FILE_BYTES } from "@/lib/import/parse";
 import { tableToRows, normalizeArabic, type ImportRow } from "@/lib/import/normalize";
-import { MAX_IMPORT_ROWS } from "@/lib/import/columns";
+import { MAX_IMPORT_ROWS, COLUMN_BY_KEY } from "@/lib/import/columns";
 import type { Gender } from "@prisma/client";
 
 export type ParseActionResult =
@@ -81,20 +81,31 @@ async function buildRows(
   user: ActionUser
 ): Promise<ParseActionResult> {
   const grades = await getScopedGradeOptions(user);
-  const { rows, headerRow, ignoredHeaders, notices } = tableToRows(table, {
+  const { rows, headerRow, mapped, ignoredHeaders, notices } = tableToRows(table, {
     defaultGradeId,
     grades,
   });
 
+  // رسالة الفشل تقول ما الذي قُرئ فعلًا وأين توقّف، لأن «لم يُعثر على شيء»
+  // لا تدل صاحب الكشف على ما يصلحه.
   if (headerRow < 0) {
     return {
       status: "error",
       message:
-        "لم يُتعرَّف على عناوين الأعمدة. نزّل القالب واكتب البيانات فيه — العناوين فيه مضبوطة.",
+        `قُرئ من الملف ${table.length} سطرًا، لكن لم يُتعرَّف على صف العناوين ` +
+        `(الاسم، تاريخ الميلاد، التليفون…). إن كان الكشف مصوَّرًا فسيُقرأ ضوئيًا، ` +
+        "وإلا فانقل البيانات إلى القالب الجاهز — عناوينه مضبوطة.",
     };
   }
   if (rows.length === 0) {
-    return { status: "error", message: "لم يُعثر على أي اسم في الملف" };
+    const known = mapped.map((key) => COLUMN_BY_KEY[key]?.header).filter(Boolean);
+    const detail = known.length
+      ? `الأعمدة المفهومة: ${known.join("، ")}.`
+      : "ولم يُفهم أي عمود.";
+    return {
+      status: "error",
+      message: `قُرئ صف العناوين من الملف، لكن لم يحمل أي سطر بعده اسمًا. ${detail}`,
+    };
   }
 
   const truncated = rows.length > MAX_IMPORT_ROWS;
