@@ -21,7 +21,7 @@ type Row = {
   enrollmentId: string;
   child: {
     id: string;
-    photoFileId: string | null;
+    photoPath: string | null;
     fullName: string;
     birthDate: Date | null;
     school: string | null;
@@ -32,7 +32,7 @@ type Row = {
 };
 
 function photoOf(child: Row["child"]) {
-  return child.photoFileId ? childPhotoUrl(child.id, child.photoFileId) : null;
+  return child.photoPath ? childPhotoUrl(child.id, child.photoPath) : null;
 }
 
 export function GradeChildrenList({

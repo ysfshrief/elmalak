@@ -49,7 +49,7 @@ export default async function ChildPage({ params }: { params: Promise<{ enrollme
         <div className="flex items-center gap-3.5">
           <Avatar
             name={child.fullName}
-            src={child.photoFileId ? childPhotoUrl(child.id, child.photoFileId) : null}
+            src={child.photoPath ? childPhotoUrl(child.id, child.photoPath) : null}
             size="lg"
           />
           <div>

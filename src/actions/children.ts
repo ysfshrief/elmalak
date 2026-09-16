@@ -7,7 +7,7 @@ import { assertGradeAccess, assertEnrollmentAccess } from "@/lib/scope";
 import { canDeleteChild } from "@/lib/roles";
 import { childSchema } from "@/lib/validation";
 import { getCurrentAcademicYear } from "@/lib/queries";
-import { deletePhoto } from "@/lib/drive";
+import { deletePhoto } from "@/lib/photo-storage";
 import type { Gender } from "@prisma/client";
 
 function childData(data: {
@@ -93,14 +93,14 @@ export async function deleteChildAction(enrollmentId: string) {
 
   const child = await prisma.child.findUnique({
     where: { id: enrollment.childId },
-    select: { photoFileId: true },
+    select: { photoPath: true },
   });
 
   await prisma.child.delete({ where: { id: enrollment.childId } });
 
   // تنظيف الصورة بعد حذف السجل: لو فشل بقي ملفٌ زائد في الخزنة لا أكثر،
   // أمّا العكس فقد يحذف صورةً ثم يُبقي مخدومًا يشير إليها.
-  if (child?.photoFileId) await deletePhoto(child.photoFileId);
+  if (child?.photoPath) await deletePhoto(child.photoPath, enrollment.childId);
 
   revalidatePath(`/grades/${enrollment.gradeId}`);
   revalidatePath("/dashboard");

@@ -13,7 +13,8 @@
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate && node scripts/prepare-ocr.mjs",
-    "make:import-file": "tsx scripts/make-import-file.ts"
+    "make:import-file": "tsx scripts/make-import-file.ts",
+    "check:photos": "NODE_OPTIONS=--conditions=react-server tsx scripts/check-photo-storage.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -36,6 +37,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-hook-form": "^7.88.0",
+    "server-only": "^0.0.1",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.7.0",
     "tesseract.js": "^7.0.0",

@@ -7,7 +7,7 @@ import {
   deletePhoto,
   isPhotoStorageConfigured,
   PhotoStorageError,
-} from "@/lib/drive";
+} from "@/lib/photo-storage";
 import {
   MAX_UPLOAD_BYTES,
   extensionForType,
@@ -57,7 +57,7 @@ async function authorize(childId: string) {
 
   const child = await prisma.child.findUnique({
     where: { id: childId },
-    select: { id: true, fullName: true, photoFileId: true },
+    select: { id: true, photoPath: true },
   });
   if (!child) return { error: json({ error: "المخدوم غير موجود" }, 404) };
 
@@ -100,24 +100,23 @@ export async function POST(request: Request, { params }: Params) {
       return json({ error: "الملف ليس صورة صالحة" }, 415);
     }
 
-    const previous = child.photoFileId;
-    const name = `${child.id}-${Date.now()}.${extensionForType(sniffed)}`;
+    const previous = child.photoPath;
 
     // ١. تُرفع الجديدة أولًا: لو فشلت، لم يتغيّر شيء والقديمة في مكانها.
-    const fileId = await uploadPhoto(buffer, sniffed, name);
+    const path = await uploadPhoto(child.id, buffer, sniffed, extensionForType(sniffed));
 
     // ٢. ثم يُحدَّث السجل. ولو فشل، تُحذف الجديدة فلا تبقى صورةً يتيمة.
     try {
-      await prisma.child.update({ where: { id: child.id }, data: { photoFileId: fileId } });
+      await prisma.child.update({ where: { id: child.id }, data: { photoPath: path } });
     } catch (error) {
-      await deletePhoto(fileId);
+      await deletePhoto(path, child.id);
       throw error;
     }
 
     // ٣. وأخيرًا تُحذف القديمة. فشلُ التنظيف لا يُفسد شيئًا، فلا يُسقط الطلب.
-    if (previous && previous !== fileId) await deletePhoto(previous);
+    if (previous && previous !== path) await deletePhoto(previous, child.id);
 
-    return json({ ok: true, version: fileId }, 200);
+    return json({ ok: true, version: path }, 200);
   } catch (error) {
     return errorResponse(error);
   }
@@ -133,15 +132,15 @@ export async function GET(request: Request, { params }: Params) {
     if (authorized.error) return authorized.error;
     const { child } = authorized;
 
-    if (!child.photoFileId) return json({ error: "لا توجد صورة" }, 404);
+    if (!child.photoPath) return json({ error: "لا توجد صورة" }, 404);
 
     // العميل الذي يطلب النسخة الحالية بالاسم يأمن تغيّرها، فتُخزَّن عنده
     // إلى الأبد؛ وغيره يسأل في كل مرة. وهكذا لا تُجلب صورة مرتين بلا داعٍ
     // ولا تظهر صورة قديمة بعد تغييرها.
     const requested = new URL(request.url).searchParams.get("v");
-    const fresh = requested === child.photoFileId;
+    const fresh = requested === child.photoPath;
 
-    const file = await downloadPhoto(child.photoFileId);
+    const file = await downloadPhoto(child.photoPath, child.id);
     const contentType = isAllowedPhotoType(file.contentType)
       ? file.contentType
       : "application/octet-stream";
@@ -150,7 +149,7 @@ export async function GET(request: Request, { params }: Params) {
       "Content-Type": contentType,
       "Content-Disposition": "inline",
       "X-Content-Type-Options": "nosniff",
-      ETag: `"${child.photoFileId}"`,
+      ETag: `"${child.photoPath}"`,
       // صور المخدومين بيانات خاصة: تُخزَّن في متصفّح صاحب الجلسة وحده.
       "Cache-Control": fresh
         ? "private, max-age=31536000, immutable"
@@ -174,12 +173,12 @@ export async function DELETE(_request: Request, { params }: Params) {
     if (authorized.error) return authorized.error;
     const { child } = authorized;
 
-    if (!child.photoFileId) return json({ ok: true }, 200);
+    if (!child.photoPath) return json({ ok: true }, 200);
 
     // يُفرَّغ السجل أولًا: لو فشل الحذف من الخزنة بقي ملفٌ زائد لا أكثر،
     // أمّا العكس فيترك سجلًا يشير إلى صورة غير موجودة.
-    await prisma.child.update({ where: { id: child.id }, data: { photoFileId: null } });
-    await deletePhoto(child.photoFileId);
+    await prisma.child.update({ where: { id: child.id }, data: { photoPath: null } });
+    await deletePhoto(child.photoPath, child.id);
 
     return json({ ok: true }, 200);
   } catch (error) {

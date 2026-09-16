@@ -26,7 +26,7 @@ export function ChildForm({
   enrollmentId?: string;
   child?: {
     id: string;
-    photoFileId: string | null;
+    photoPath: string | null;
     fullName: string;
     gender: string | null;
     address: string | null;
@@ -101,7 +101,7 @@ export function ChildForm({
         ref={photoRef}
         name={watch("fullName")}
         childId={child?.id}
-        initialVersion={child?.photoFileId}
+        initialVersion={child?.photoPath}
         disabled={isSubmitting}
       />
 

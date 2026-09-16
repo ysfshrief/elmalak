@@ -1,12 +1,12 @@
 import { CheckCircle2, AlertTriangle, ImageOff } from "lucide-react";
-import { checkPhotoStorage, isPhotoStorageConfigured } from "@/lib/drive";
+import { checkPhotoStorage, isPhotoStorageConfigured } from "@/lib/photo-storage";
 
 /**
  * حالة خزنة صور المخدومين.
  *
  * ضبط الخزنة يتم بمتغيّرات بيئة لا يراها أحد، وخطأٌ فيها لا يظهر إلا عند
  * أول محاولة رفع. فهذا الفحص يجيب عن السؤال قبل أن يُسأل: هل المفتاح صحيح،
- * وهل المجلّد المحدَّد موجود ومتاح للخدمة؟
+ * وهل الحاوية موجودة، وهل ما تزال خاصة؟
  */
 export async function PhotoStorageStatus() {
   if (!isPhotoStorageConfigured()) {
@@ -37,7 +37,7 @@ export async function PhotoStorageStatus() {
       icon={CheckCircle2}
       tone="text-success"
       title="خزنة الصور تعمل"
-      detail={`المجلّد: ${result.folderName} — عبر ${result.mode}`}
+      detail={`الحاوية: ${result.bucket} — خاصة`}
     />
   );
 }

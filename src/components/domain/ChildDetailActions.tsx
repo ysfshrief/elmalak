@@ -21,7 +21,7 @@ export function ChildDetailActions({
   canDelete: boolean;
   child: {
     id: string;
-    photoFileId: string | null;
+    photoPath: string | null;
     fullName: string;
     gender: string | null;
     address: string | null;
