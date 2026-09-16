@@ -40,6 +40,12 @@ model Service {
   name       String // خدمة التربية الكنسية
   churchName String // كنيسة رئيس الملائكة الجليل ميخائيل بدمنهور
 
+  /// نظام نقاط الحضور اختياري. النقاط تُحسب من سجلات الحضور ولا تُخزَّن معها،
+  /// فتعطيل النظام لا يمسّ سجلًا واحدًا، وتفعيله لاحقًا يحسبها بأثر رجعي.
+  attendancePointsEnabled Boolean @default(false)
+  /// عدد النقاط لكل حضور — قابل للضبط، لا رقم مثبَّت في الكود.
+  attendancePointValue    Int     @default(1)
+
   stages      Stage[]
   assignments Assignment[]
 

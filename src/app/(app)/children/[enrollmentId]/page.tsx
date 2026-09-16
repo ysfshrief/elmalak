@@ -4,8 +4,9 @@ import { notFound } from "next/navigation";
 import { ChevronLeft, MapPin, School, Cross, Cake, ClipboardCheck, HeartHandshake } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getEnrollmentDetail, getChildAttendanceStats, getVisitationHistory } from "@/lib/queries";
+import { getChildAttendanceSummary } from "@/lib/attendance-stats";
 import { canDeleteChild } from "@/lib/roles";
-import { Avatar } from "@/components/ui/Avatar";
+import { ChildPhotoAvatar } from "@/components/domain/ChildPhotoAvatar";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { ChildDetailActions } from "@/components/domain/ChildDetailActions";
@@ -30,9 +31,10 @@ export default async function ChildPage({ params }: { params: Promise<{ enrollme
   if (!enrollment) notFound();
 
   const { child, grade } = enrollment;
-  const [attendance, visitation] = await Promise.all([
+  const [attendance, visitation, summary] = await Promise.all([
     getChildAttendanceStats(user, enrollmentId),
     getVisitationHistory(user, enrollmentId, 6),
+    getChildAttendanceSummary(enrollmentId),
   ]);
 
   return (
@@ -47,10 +49,9 @@ export default async function ChildPage({ params }: { params: Promise<{ enrollme
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between animate-fade-in-up">
         <div className="flex items-center gap-3.5">
-          <Avatar
+          <ChildPhotoAvatar
             name={child.fullName}
             src={child.photoPath ? childPhotoUrl(child.id, child.photoPath) : null}
-            size="lg"
           />
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -125,11 +126,24 @@ export default async function ChildPage({ params }: { params: Promise<{ enrollme
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-extrabold tabular-nums text-ink">
-                {attendance.rate !== null ? `${attendance.rate}%` : "—"}
+                {summary.rate !== null ? `${summary.rate}٪` : "—"}
               </p>
               <p className="text-sm text-ink-faint">
-                {attendance.present} من {attendance.total} جلسة
+                {summary.present} حضور من {summary.records} سجلًا
               </p>
+              {summary.records > 0 && (
+                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-border/70">
+                  <div
+                    className="h-full rounded-full bg-primary"
+                    style={{ width: `${Math.max(summary.rate ?? 0, 1.5)}%` }}
+                  />
+                </div>
+              )}
+              <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-muted">
+                <Tally label="غياب" value={summary.absent} />
+                <Tally label="بعذر" value={summary.excused} />
+                {summary.points !== null && <Tally label="نقاط" value={summary.points} strong />}
+              </dl>
             </CardContent>
           </Card>
 
@@ -184,6 +198,21 @@ export default async function ChildPage({ params }: { params: Promise<{ enrollme
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+
+function Tally({ label, value, strong }: { label: string; value: number; strong?: boolean }) {
+  return (
+    <div className="flex items-center gap-1">
+      <dt>{label}</dt>
+      <dd
+        className={
+          strong ? "font-bold tabular-nums text-primary-ink" : "font-semibold tabular-nums text-ink"
+        }
+      >
+        {value}
+      </dd>
     </div>
   );
 }

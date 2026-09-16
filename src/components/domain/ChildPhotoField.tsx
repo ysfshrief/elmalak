@@ -15,11 +15,12 @@ import {
 import {
   childPhotoUrl,
   deleteChildPhoto,
-  preparePhoto,
   uploadChildPhoto,
   type PreparedPhoto,
   type UploadHandle,
 } from "@/lib/photo-client";
+import { ImageCropper } from "@/components/domain/ImageCropper";
+import { ImageViewer } from "@/components/domain/ImageViewer";
 
 /**
  * حقل صورة المخدوم.
@@ -54,6 +55,9 @@ export const ChildPhotoField = React.forwardRef<
   // الصورة المجهَّزة تُحفظ في مرجع (لتقرأها `uploadPending` بلا إغلاق قديم)
   // وتُرصد في حالة، لأن العرض لا يجوز أن يقرأ مرجعًا فلا يُعاد رسمه عند تغيّره.
   const [hasPrepared, setHasPrepared] = React.useState(false);
+  /** الملف المختار بانتظار القصّ — القصّ يقع قبل الرفع لا بعده. */
+  const [cropping, setCropping] = React.useState<File | null>(null);
+  const [viewing, setViewing] = React.useState(false);
   const [version, setVersion] = React.useState<string | null>(initialVersion ?? null);
   const [preview, setPreview] = React.useState<string | null>(null);
   const [phase, setPhase] = React.useState<Phase>("idle");
@@ -122,19 +126,19 @@ export const ChildPhotoField = React.forwardRef<
       return;
     }
 
-    if (preview) URL.revokeObjectURL(preview);
-    setPreview(URL.createObjectURL(file));
-    setPhase("preparing");
-    setProgress(0);
+    setCropping(file);
+  }
 
-    try {
-      preparedRef.current = await preparePhoto(file);
-      setHasPrepared(true);
-    } catch (e) {
-      setPhase("error");
-      setError(e instanceof Error ? e.message : "تعذّرت قراءة الصورة");
-      return;
-    }
+  /** بعد اعتماد القصّ: هذه هي البايتات التي تُرفع — لا الملف الأصلي. */
+  async function handleCropped(photo: PreparedPhoto) {
+    setCropping(null);
+    preparedRef.current = photo;
+    setHasPrepared(true);
+
+    // لا يُلغى الرابط القديم هنا: الصورة ما تزال تشير إليه حتى يُعاد الرسم.
+    // أثرُ التنظيف أدناه يلغيه بعد أن تحلّ الجديدة محلّه.
+    setPreview(URL.createObjectURL(photo.blob));
+    setProgress(0);
 
     if (childId) await runUpload(childId);
     // بلا مخدوم بعد: الصورة جاهزة وتُرفع فور إنشائه.
@@ -168,7 +172,18 @@ export const ChildPhotoField = React.forwardRef<
       <Label>صورة المخدوم</Label>
       <div className="flex items-center gap-4">
         <div className="relative">
-          <Avatar name={name || "؟"} src={shownSrc} size="xl" />
+          {shownSrc && !busy ? (
+            <button
+              type="button"
+              onClick={() => setViewing(true)}
+              aria-label={`عرض صورة ${name || "المخدوم"} بالحجم الكامل`}
+              className="rounded-full transition-transform duration-150 hover:scale-[1.03] focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+            >
+              <Avatar name={name || "؟"} src={shownSrc} size="xl" />
+            </button>
+          ) : (
+            <Avatar name={name || "؟"} src={shownSrc} size="xl" />
+          )}
 
           {busy && (
             <div className="absolute inset-0 flex items-center justify-center rounded-full bg-ink/65 backdrop-blur-[1px]">
@@ -236,6 +251,22 @@ export const ChildPhotoField = React.forwardRef<
           </div>
         </div>
       </div>
+
+      {cropping && (
+        <ImageCropper
+          file={cropping}
+          onCancel={() => setCropping(null)}
+          onCropped={handleCropped}
+        />
+      )}
+
+      {viewing && shownSrc && (
+        <ImageViewer
+          src={shownSrc}
+          alt={`صورة ${name || "المخدوم"}`}
+          onClose={() => setViewing(false)}
+        />
+      )}
 
       <input
         ref={inputRef}

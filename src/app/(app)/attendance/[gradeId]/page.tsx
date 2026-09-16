@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { DateNav } from "@/components/domain/DateNav";
 import { AttendanceGrid } from "@/components/domain/AttendanceGrid";
+import { AttendanceHistory } from "@/components/domain/AttendanceHistory";
 import { formatArabicDate } from "@/lib/utils";
 import type { AttendanceStatus } from "@prisma/client";
 
@@ -89,27 +90,16 @@ export default async function AttendanceGradePage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="divide-y divide-border">
-              {history.slice(0, 8).map((s) => {
-                const present = s.records.filter((r) => r.status === "PRESENT").length;
-                const iso = s.date.toISOString().slice(0, 10);
-                return (
-                  <li key={s.id}>
-                    <a
-                      href={`/attendance/${gradeId}?date=${iso}`}
-                      className="flex items-center justify-between py-2.5 text-sm hover:text-primary"
-                    >
-                      <span className={iso === date ? "font-bold text-primary" : "text-ink"}>
-                        {formatArabicDate(s.date)}
-                      </span>
-                      <span className="tabular-nums text-ink-faint">
-                        {present} / {s.records.length} حاضر
-                      </span>
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
+            <AttendanceHistory
+              gradeId={gradeId}
+              activeDate={date}
+              sessions={history.slice(0, 8).map((s) => ({
+                id: s.id,
+                date: s.date.toISOString().slice(0, 10),
+                present: s.records.filter((r) => r.status === "PRESENT").length,
+                total: s.records.length,
+              }))}
+            />
           </CardContent>
         </Card>
       )}

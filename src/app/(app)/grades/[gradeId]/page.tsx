@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { ClipboardCheck, HeartHandshake, Users, ChevronLeft } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getGradeDetail } from "@/lib/queries";
-import { canRenameGradeFamily } from "@/lib/roles";
+import { canRenameGradeFamily, canDeleteChild } from "@/lib/roles";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { GradeChildrenList } from "@/components/domain/GradeChildrenList";
@@ -71,6 +71,7 @@ export default async function GradePage({ params }: { params: Promise<{ gradeId:
         gradeId={grade.id}
         familyName={grade.familyName}
         canRenameFamily={canRenameGradeFamily(user.role)}
+        canDelete={canDeleteChild(user.role)}
         rows={grade.enrollments.map((e) => ({ enrollmentId: e.id, child: e.child }))}
       />
     </div>

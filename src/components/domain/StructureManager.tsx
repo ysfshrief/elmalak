@@ -8,6 +8,7 @@ import { Plus, Trash2, Layers, Users, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { DeletableRow, LongPressHint } from "@/components/ui/DeleteGesture";
 import { Input, Select, Label, FieldError } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import {
@@ -100,6 +101,23 @@ export function StructureManager({ stages }: { stages: Stage[] }) {
     router.refresh();
   }
 
+  /** يستعمله الضغط المطوّل — نفس الأفعال التي تستعملها أزرار الحذف الظاهرة. */
+  const remove = React.useCallback(
+    async (kind: "stage" | "division" | "grade", id: string) => {
+      try {
+        if (kind === "stage") await deleteStageAction(id);
+        if (kind === "division") await deleteDivisionAction(id);
+        if (kind === "grade") await deleteGradeAction(id);
+        toast.success("تم الحذف");
+        router.refresh();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "تعذّر الحذف");
+        throw e;
+      }
+    },
+    [router]
+  );
+
   async function confirmDelete() {
     if (!pendingDelete) return;
     setBusy(true);
@@ -126,10 +144,18 @@ export function StructureManager({ stages }: { stages: Stage[] }) {
         </Button>
       </div>
 
+      <LongPressHint>اضغط مطوّلًا على أي مرحلة أو قسم أو صف لحذفه</LongPressHint>
+
       <div className="space-y-4">
         {stages.map((stage) => (
           <div key={stage.id} className="rounded-[var(--radius-lg)] border border-border bg-surface">
-            <div className="flex items-center justify-between gap-3 border-b border-border p-4">
+            <DeletableRow
+              as="div"
+              name={stage.name}
+              description={`سيُحذف «${stage.name}» بكل أقسامه وصفوفه ومخدوميه، ولا يمكن التراجع.`}
+              onDelete={() => remove("stage", stage.id)}
+              className="flex items-center justify-between gap-3 border-b border-border p-4 data-[armed]:bg-error-soft/50"
+            >
               <div className="flex items-center gap-2">
                 <Layers className="size-4.5 text-primary" />
                 <h3 className="font-bold text-ink">{stage.name}</h3>
@@ -148,14 +174,20 @@ export function StructureManager({ stages }: { stages: Stage[] }) {
                   <Trash2 className="size-3.5 text-error" />
                 </Button>
               </div>
-            </div>
+            </DeletableRow>
 
             {stage.divisions.length === 0 ? (
               <p className="p-4 text-sm text-ink-faint">لا توجد أقسام في هذه المرحلة</p>
             ) : (
               stage.divisions.map((division) => (
                 <div key={division.id} className="border-b border-border last:border-0">
-                  <div className="flex items-center justify-between gap-3 bg-bg-alt/50 px-4 py-2.5">
+                  <DeletableRow
+                    as="div"
+                    name={division.name}
+                    description={`سيُحذف قسم «${division.name}» بكل صفوفه ومخدوميه، ولا يمكن التراجع.`}
+                    onDelete={() => remove("division", division.id)}
+                    className="flex items-center justify-between gap-3 bg-bg-alt/50 px-4 py-2.5 data-[armed]:bg-error-soft/50"
+                  >
                     <p className="text-sm font-bold text-ink-muted">{division.name}</p>
                     <div className="flex gap-1.5">
                       <Button variant="outline" size="sm" onClick={() => setAddGradeTo({ stage, division })}>
@@ -172,11 +204,17 @@ export function StructureManager({ stages }: { stages: Stage[] }) {
                         <Trash2 className="size-3.5 text-error" />
                       </Button>
                     </div>
-                  </div>
+                  </DeletableRow>
 
                   <ul className="divide-y divide-border">
                     {division.grades.map((grade) => (
-                      <li key={grade.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                      <DeletableRow
+                        key={grade.id}
+                        name={grade.name}
+                        description={`سيُحذف «${grade.name}» بكل مخدوميه وسجلاتهم، ولا يمكن التراجع.`}
+                        onDelete={() => remove("grade", grade.id)}
+                        className="flex items-center justify-between gap-3 px-4 py-2.5 data-[armed]:bg-error-soft/50"
+                      >
                         <Link href={`/grades/${grade.id}`} className="flex min-w-0 items-center gap-2 hover:text-primary">
                           <ChevronLeft className="size-4 shrink-0" />
                           <span className="truncate font-medium text-ink">{grade.name}</span>
@@ -195,7 +233,7 @@ export function StructureManager({ stages }: { stages: Stage[] }) {
                         >
                           <Trash2 className="size-3.5 text-error" />
                         </Button>
-                      </li>
+                      </DeletableRow>
                     ))}
                   </ul>
                 </div>

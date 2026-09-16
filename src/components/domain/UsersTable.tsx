@@ -8,6 +8,7 @@ import { SearchInput } from "@/components/ui/SearchInput";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { DeletableRow, LongPressHint } from "@/components/ui/DeleteGesture";
 import { EmptyState } from "@/components/ui/States";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
@@ -66,11 +67,11 @@ export function UsersTable({
     return users.filter((u) => u.name.includes(q) || u.username.includes(q));
   }, [users, query]);
 
-  function refresh() {
+  const refresh = React.useCallback(() => {
     setCreateOpen(false);
     setEditUser(null);
     router.refresh();
-  }
+  }, [router]);
 
   async function handleToggle(u: UserRow) {
     try {
@@ -81,6 +82,21 @@ export function UsersTable({
       toast.error(e instanceof Error ? e.message : "تعذر تنفيذ العملية");
     }
   }
+
+  /** يستعمله الضغط المطوّل؛ والزرّ الظاهر يمرّ على نافذة التأكيد نفسها. */
+  const removeUser = React.useCallback(
+    async (userId: string, name: string) => {
+      try {
+        await deleteUserAction(userId);
+        toast.success(`تم حذف حساب ${name}`);
+        refresh();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "تعذّر الحذف");
+        throw e;
+      }
+    },
+    [refresh]
+  );
 
   async function handleDelete() {
     if (!deleteUser) return;
@@ -112,14 +128,20 @@ export function UsersTable({
         </Button>
       </div>
 
+      <LongPressHint>اضغط مطوّلًا على أي مستخدم لحذفه</LongPressHint>
+
       {filtered.length === 0 ? (
         <EmptyState icon={UserCog} title="لا يوجد مستخدمون" />
       ) : (
         <ul className="space-y-2.5">
           {filtered.map((u) => (
-            <li
+            <DeletableRow
               key={u.id}
-              className="flex flex-col gap-3 rounded-[var(--radius-lg)] border border-border bg-surface p-3.5 sm:flex-row sm:items-center sm:justify-between"
+              name={u.name}
+              description={`سيُحذف حساب «${u.name}» نهائيًا مع كل تكليفاته.`}
+              disabled={u.id === currentUserId}
+              onDelete={() => removeUser(u.id, u.name)}
+              className="flex flex-col gap-3 rounded-[var(--radius-lg)] border border-border bg-surface p-3.5 data-[armed]:ring-2 data-[armed]:ring-error sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="flex items-center gap-3">
                 <Avatar name={u.name} />
@@ -154,7 +176,7 @@ export function UsersTable({
                   <Trash2 className="size-3.5" />
                 </Button>
               </div>
-            </li>
+            </DeletableRow>
           ))}
         </ul>
       )}

@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { ageOn, daysUntilBirthday, toCalendarDate } from "@/lib/dates";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -24,44 +25,36 @@ export function monthName(month: number) {
   return ARABIC_MONTHS[(month - 1 + 12) % 12];
 }
 
+/**
+ * تواريخ المشروع كلها (ميلاد المخدوم، تاريخ الاجتماع) تواريخ تقويمية مخزَّنة
+ * عند منتصف ليل UTC، فتُقرأ بدوالّ UTC. وقراءتها محلّيًا تُنقص يومًا كاملًا
+ * على أي خادم متأخّر عن UTC.
+ */
 export function formatArabicDate(date: Date | string | null | undefined) {
   if (!date) return "—";
-  const d = typeof date === "string" ? new Date(date) : date;
-  if (Number.isNaN(d.getTime())) return "—";
-  return `${d.getDate()} ${monthName(d.getMonth() + 1)} ${d.getFullYear()}`;
+  const parts = toCalendarDate(date);
+  if (!parts) return "—";
+  return `${parts.day} ${monthName(parts.month)} ${parts.year}`;
 }
 
 export function formatShortDate(date: Date | string | null | undefined) {
   if (!date) return "—";
-  const d = typeof date === "string" ? new Date(date) : date;
-  if (Number.isNaN(d.getTime())) return "—";
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  return `${dd}/${mm}/${d.getFullYear()}`;
+  const parts = toCalendarDate(date);
+  if (!parts) return "—";
+  return `${String(parts.day).padStart(2, "0")}/${String(parts.month).padStart(2, "0")}/${parts.year}`;
 }
 
+/** العمر الحقيقي اليوم — سنواتٌ مكتملة، لا فرق بين السنتين. */
 export function calculateAge(birthDate: Date | string | null | undefined) {
   if (!birthDate) return null;
-  const d = typeof birthDate === "string" ? new Date(birthDate) : birthDate;
-  if (Number.isNaN(d.getTime())) return null;
-  const now = new Date();
-  let age = now.getFullYear() - d.getFullYear();
-  const monthDiff = now.getMonth() - d.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < d.getDate())) {
-    age -= 1;
-  }
-  return age;
+  const parts = toCalendarDate(birthDate);
+  return parts ? ageOn(parts) : null;
 }
 
-/** Days until the next occurrence of this birthday (0 = today). */
+/** الأيام حتى عيد الميلاد القادم (صفر = اليوم). */
 export function daysUntilNextBirthday(birthDate: Date | string) {
-  const d = typeof birthDate === "string" ? new Date(birthDate) : birthDate;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  let next = new Date(today.getFullYear(), d.getMonth(), d.getDate());
-  next.setHours(0, 0, 0, 0);
-  if (next < today) next = new Date(today.getFullYear() + 1, d.getMonth(), d.getDate());
-  return Math.round((next.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const parts = toCalendarDate(birthDate);
+  return parts ? daysUntilBirthday(parts) : Number.POSITIVE_INFINITY;
 }
 
 export const PHONE_LABELS = ["الأب", "الأم", "المخدوم", "البيت", "الأخ"] as const;

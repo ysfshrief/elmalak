@@ -3,6 +3,7 @@
 import * as React from "react";
 import { ChevronDown, Trash2, AlertTriangle } from "lucide-react";
 import { Input, Label, Select } from "@/components/ui/Input";
+import { DateField } from "@/components/ui/DateField";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 import { PHONE_LABELS, PHONE_SLOTS } from "@/lib/import/columns";
@@ -178,11 +179,10 @@ export function ImportReviewRow({
 
           <div>
             <Label htmlFor={fieldId("birth")}>تاريخ الميلاد</Label>
-            <Input
+            <DateField
               id={fieldId("birth")}
-              type="date"
               value={row.birthDate}
-              onChange={(e) => set("birthDate", e.target.value)}
+              onChange={(v) => set("birthDate", v)}
             />
           </div>
 

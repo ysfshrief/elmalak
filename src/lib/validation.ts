@@ -1,4 +1,24 @@
 import { z } from "zod";
+import { isFuture, parseISODateString } from "@/lib/dates";
+
+/**
+ * تاريخ ميلاد اختياري: إمّا فارغ، وإمّا يومٌ موجود فعلًا في التقويم وليس في
+ * المستقبل. التحقق هنا يقع على الخادم أيضًا، فلا يكفي منعُ الواجهة.
+ */
+const birthDateSchema = z
+  .string()
+  .optional()
+  .or(z.literal(""))
+  .refine((value) => !value || parseISODateString(value) !== null, {
+    message: "تاريخ الميلاد غير صحيح",
+  })
+  .refine(
+    (value) => {
+      const parsed = value ? parseISODateString(value) : null;
+      return !parsed || !isFuture(parsed);
+    },
+    { message: "تاريخ الميلاد لا يكون في المستقبل" }
+  );
 
 export const loginSchema = z.object({
   username: z.string().min(1, "من فضلك أدخل اسم المستخدم"),
@@ -19,7 +39,7 @@ export const childSchema = z.object({
   gradeId: z.string().min(1, "اختر الصف"),
   gender: z.enum(["MALE", "FEMALE"]).optional().or(z.literal("")),
   address: z.string().trim().optional().or(z.literal("")),
-  birthDate: z.string().optional().or(z.literal("")),
+  birthDate: birthDateSchema,
   school: z.string().trim().optional().or(z.literal("")),
   confessionFather: z.string().trim().optional().or(z.literal("")),
   notes: z.string().trim().optional().or(z.literal("")),
@@ -97,7 +117,7 @@ export const importRowSchema = z.object({
   fullName: z.string().trim().min(2, "اسم المخدوم مطلوب"),
   gradeId: z.string().min(1, "اختر الصف"),
   gender: z.enum(["MALE", "FEMALE"]).optional().or(z.literal("")),
-  birthDate: z.string().optional().or(z.literal("")),
+  birthDate: birthDateSchema,
   school: z.string().trim().optional().or(z.literal("")),
   confessionFather: z.string().trim().optional().or(z.literal("")),
   address: z.string().trim().optional().or(z.literal("")),
@@ -109,4 +129,14 @@ export const importCommitSchema = z.object({
   rows: z.array(importRowSchema).min(1, "لا توجد صفوف للحفظ"),
   /** إضافة أسماء موجودة بالفعل في الصف نفسه هذا العام. */
   allowDuplicates: z.boolean(),
+});
+
+/** إعدادات نقاط الحضور على مستوى الخدمة. */
+export const attendancePointsSchema = z.object({
+  enabled: z.boolean(),
+  pointValue: z.coerce
+    .number()
+    .int("النقاط عدد صحيح")
+    .min(1, "أقل قيمة نقطة واحدة")
+    .max(1000, "قيمة كبيرة جدًا"),
 });

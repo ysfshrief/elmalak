@@ -5,7 +5,13 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { assertGradeAccess } from "@/lib/scope";
 import { canManageStructure, canRenameGradeFamily } from "@/lib/roles";
-import { stageSchema, divisionSchema, gradeSchema, gradeFamilyNameSchema } from "@/lib/validation";
+import {
+  stageSchema,
+  divisionSchema,
+  gradeSchema,
+  gradeFamilyNameSchema,
+  attendancePointsSchema,
+} from "@/lib/validation";
 import type { Gender } from "@prisma/client";
 
 async function requireStructureAdmin() {
@@ -110,4 +116,30 @@ export async function setGradeFamilyNameAction(input: unknown) {
 
   revalidatePath(`/grades/${parsed.data.gradeId}`);
   revalidateStructure();
+}
+
+/**
+ * إعدادات نقاط الحضور — إعدادٌ على مستوى الخدمة، فهو لمسؤول النظام وحده.
+ * ولا يمسّ سجلًا واحدًا من سجلات الحضور: النقاط تُحسب منها ولا تُخزَّن فيها.
+ */
+export async function setAttendancePointsAction(input: unknown) {
+  await requireStructureAdmin();
+
+  const parsed = attendancePointsSchema.safeParse(input);
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "بيانات غير صحيحة");
+
+  const service = await prisma.service.findFirst({ select: { id: true } });
+  if (!service) throw new Error("لا توجد خدمة مُهيّأة");
+
+  await prisma.service.update({
+    where: { id: service.id },
+    data: {
+      attendancePointsEnabled: parsed.data.enabled,
+      attendancePointValue: parsed.data.pointValue,
+    },
+  });
+
+  revalidatePath("/settings/points");
+  revalidatePath("/statistics");
+  revalidatePath("/dashboard");
 }

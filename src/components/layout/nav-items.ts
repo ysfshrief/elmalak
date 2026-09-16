@@ -5,6 +5,7 @@ import {
   ClipboardCheck,
   HeartHandshake,
   Cake,
+  ChartColumn,
   FileUp,
   Settings,
   type LucideIcon,
@@ -23,6 +24,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/hierarchy", label: "المراحل والصفوف", icon: Network, matchPrefix: true },
   { href: "/attendance", label: "الحضور والغياب", icon: ClipboardCheck, matchPrefix: true },
   { href: "/visitation", label: "الافتقاد", icon: HeartHandshake, matchPrefix: true },
+  { href: "/statistics", label: "إحصائيات الحضور", icon: ChartColumn },
   { href: "/birthdays", label: "أعياد الميلاد", icon: Cake },
   { href: "/import", label: "استيراد كشف", icon: FileUp },
   {

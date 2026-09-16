@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/Badge";
 import { Input, Label } from "@/components/ui/Input";
 import { ChildForm } from "@/components/domain/ChildForm";
 import { setGradeFamilyNameAction } from "@/actions/structure";
+import { deleteChildAction } from "@/actions/children";
+import { DeletableRow, LongPressHint } from "@/components/ui/DeleteGesture";
 import { childPhotoUrl } from "@/lib/photo-client";
 import { formatArabicDate, calculateAge } from "@/lib/utils";
 
@@ -39,11 +41,13 @@ export function GradeChildrenList({
   gradeId,
   familyName,
   canRenameFamily,
+  canDelete,
   rows,
 }: {
   gradeId: string;
   familyName: string | null;
   canRenameFamily: boolean;
+  canDelete: boolean;
   rows: Row[];
 }) {
   const router = useRouter();
@@ -52,6 +56,23 @@ export function GradeChildrenList({
   const [renameOpen, setRenameOpen] = React.useState(false);
   const [nameDraft, setNameDraft] = React.useState(familyName ?? "");
   const [savingName, setSavingName] = React.useState(false);
+
+  const removeChild = React.useCallback(
+    async (enrollmentId: string, name: string) => {
+      try {
+        await deleteChildAction(enrollmentId);
+        toast.success(`تم حذف ${name}`);
+        router.refresh();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "تعذّر الحذف");
+        throw e;
+      }
+    },
+    [router]
+  );
+
+  const deleteDescription = (name: string) =>
+    `سيُحذف «${name}» وكل سجلات حضوره وافتقاده في كل السنوات، ولا يمكن التراجع.`;
 
   const filtered = React.useMemo(() => {
     const q = query.trim();
@@ -117,6 +138,7 @@ export function GradeChildrenList({
         />
       ) : (
         <>
+          {canDelete && <LongPressHint>اضغط مطوّلًا على أي مخدوم لحذفه</LongPressHint>}
           <div className="hidden overflow-hidden rounded-[var(--radius-lg)] border border-border sm:block">
             <table className="w-full text-sm">
               <thead className="bg-bg-alt text-ink-muted">
@@ -130,10 +152,15 @@ export function GradeChildrenList({
               </thead>
               <tbody className="divide-y divide-border">
                 {filtered.map((r) => (
-                  <tr
+                  <DeletableRow
+                    as="tr"
                     key={r.enrollmentId}
-                    className="cursor-pointer transition-colors hover:bg-bg-alt"
+                    name={r.child.fullName}
+                    description={deleteDescription(r.child.fullName)}
+                    disabled={!canDelete}
+                    onDelete={() => removeChild(r.enrollmentId, r.child.fullName)}
                     onClick={() => router.push(`/children/${r.enrollmentId}`)}
+                    className="cursor-pointer transition-colors hover:bg-bg-alt data-[armed]:bg-error-soft/50"
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
@@ -153,7 +180,7 @@ export function GradeChildrenList({
                     <td className="px-4 py-3 text-ink-muted tabular-nums">
                       {r.child.phones[0]?.number || "—"}
                     </td>
-                  </tr>
+                  </DeletableRow>
                 ))}
               </tbody>
             </table>
@@ -161,7 +188,14 @@ export function GradeChildrenList({
 
           <ul className="space-y-2.5 sm:hidden">
             {filtered.map((r) => (
-              <li key={r.enrollmentId}>
+              <DeletableRow
+                key={r.enrollmentId}
+                name={r.child.fullName}
+                description={deleteDescription(r.child.fullName)}
+                disabled={!canDelete}
+                onDelete={() => removeChild(r.enrollmentId, r.child.fullName)}
+                className="rounded-[var(--radius-lg)] data-[armed]:ring-2 data-[armed]:ring-error"
+              >
                 <Link
                   href={`/children/${r.enrollmentId}`}
                   className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-border bg-surface p-3.5 active:scale-[0.99] transition-transform"
@@ -194,7 +228,7 @@ export function GradeChildrenList({
                     </div>
                   </div>
                 </Link>
-              </li>
+              </DeletableRow>
             ))}
           </ul>
         </>

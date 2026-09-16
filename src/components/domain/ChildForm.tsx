@@ -9,6 +9,7 @@ import { z } from "zod";
 import { childSchema } from "@/lib/validation";
 import { PHONE_LABELS } from "@/lib/utils";
 import { Input, Textarea, Select, Label, FieldError } from "@/components/ui/Input";
+import { DateField } from "@/components/ui/DateField";
 import { Button } from "@/components/ui/Button";
 import { ChildPhotoField, type ChildPhotoFieldHandle } from "@/components/domain/ChildPhotoField";
 import { createChildAction, updateChildAction } from "@/actions/children";
@@ -53,6 +54,7 @@ export function ChildForm({
       gradeId,
       gender: (child?.gender ?? "") as FormValues["gender"],
       address: child?.address ?? "",
+      // ‎toISOString‎ يعطي يوم UTC، وهو نفس اليوم المخزَّن — لا يوم الخادم المحلّي.
       birthDate: child?.birthDate ? child.birthDate.toISOString().slice(0, 10) : "",
       school: child?.school ?? "",
       confessionFather: child?.confessionFather ?? "",
@@ -116,7 +118,20 @@ export function ChildForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <Label htmlFor="birthDate">تاريخ الميلاد</Label>
-          <Input id="birthDate" type="date" {...register("birthDate")} />
+          <Controller
+            control={control}
+            name="birthDate"
+            render={({ field }) => (
+              <DateField
+                id="birthDate"
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                error={errors.birthDate?.message}
+                disabled={isSubmitting}
+              />
+            )}
+          />
         </div>
         <div>
           <Label htmlFor="school">المدرسة</Label>
