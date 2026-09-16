@@ -20,6 +20,8 @@ export function ChildDetailActions({
   gradeId: string;
   canDelete: boolean;
   child: {
+    id: string;
+    photoFileId: string | null;
     fullName: string;
     gender: string | null;
     address: string | null;

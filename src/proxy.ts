@@ -33,6 +33,15 @@ export async function proxy(request: NextRequest) {
   const authed = await hasValidSession(request);
 
   if (!isPublic && !authed) {
+    // مسارات الواجهة البرمجية تُجيب برمز حالة لا بتحويل إلى صفحة الدخول:
+    // التحويل يجعل الطلب ينجح بـ٢٠٠ ومعه صفحة HTML، فتظنّه الواجهة صورةً
+    // أو ردًّا صالحًا، ويضيع الخبر الحقيقي: أن الجلسة انتهت.
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: "انتهت الجلسة — سجّل الدخول مرة أخرى" },
+        { status: 401 }
+      );
+    }
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);

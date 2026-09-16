@@ -10,6 +10,7 @@ import { childSchema } from "@/lib/validation";
 import { PHONE_LABELS } from "@/lib/utils";
 import { Input, Textarea, Select, Label, FieldError } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { ChildPhotoField, type ChildPhotoFieldHandle } from "@/components/domain/ChildPhotoField";
 import { createChildAction, updateChildAction } from "@/actions/children";
 
 type FormValues = z.infer<typeof childSchema>;
@@ -24,6 +25,8 @@ export function ChildForm({
   /** موجود عند التعديل فقط. */
   enrollmentId?: string;
   child?: {
+    id: string;
+    photoFileId: string | null;
     fullName: string;
     gender: string | null;
     address: string | null;
@@ -35,9 +38,12 @@ export function ChildForm({
   };
   onSuccess: () => void;
 }) {
+  const photoRef = React.useRef<ChildPhotoFieldHandle>(null);
+
   const {
     register,
     control,
+    watch,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
@@ -62,9 +68,24 @@ export function ChildForm({
       if (enrollmentId) {
         await updateChildAction(enrollmentId, values);
         toast.success("تم تحديث بيانات المخدوم");
-      } else {
-        await createChildAction(values);
-        toast.success("تم إضافة المخدوم بنجاح");
+        onSuccess();
+        return;
+      }
+
+      const created = await createChildAction(values);
+      toast.success("تم إضافة المخدوم بنجاح");
+
+      // الصورة تُرفع بعد إنشاء السجل، إذ لا تُنسب صورة إلى مخدوم لم يوجد
+      // بعد. وفشلُ الرفع لا يُلغي المخدوم: يبقى مضافًا وتُعاد المحاولة من
+      // صفحته.
+      if (photoRef.current?.hasPending()) {
+        try {
+          await photoRef.current.uploadPending(created.id);
+          // النافذة تُغلق بعد قليل فتختفي رسالة الحقل، والتأكيد لا يُترك للحظة.
+          toast.success("تم حفظ صورة المخدوم بنجاح");
+        } catch {
+          toast.error("أُضيف المخدوم، لكن تعذّر حفظ الصورة — أعد رفعها من صفحته");
+        }
       }
       onSuccess();
     } catch (e) {
@@ -75,6 +96,14 @@ export function ChildForm({
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
       <input type="hidden" {...register("gradeId")} />
+
+      <ChildPhotoField
+        ref={photoRef}
+        name={watch("fullName")}
+        childId={child?.id}
+        initialVersion={child?.photoFileId}
+        disabled={isSubmitting}
+      />
 
       <div>
         <Label htmlFor="fullName" required>

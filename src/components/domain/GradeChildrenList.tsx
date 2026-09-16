@@ -14,12 +14,14 @@ import { Badge } from "@/components/ui/Badge";
 import { Input, Label } from "@/components/ui/Input";
 import { ChildForm } from "@/components/domain/ChildForm";
 import { setGradeFamilyNameAction } from "@/actions/structure";
+import { childPhotoUrl } from "@/lib/photo-client";
 import { formatArabicDate, calculateAge } from "@/lib/utils";
 
 type Row = {
   enrollmentId: string;
   child: {
     id: string;
+    photoFileId: string | null;
     fullName: string;
     birthDate: Date | null;
     school: string | null;
@@ -28,6 +30,10 @@ type Row = {
     phones: { id: string; label: string; number: string }[];
   };
 };
+
+function photoOf(child: Row["child"]) {
+  return child.photoFileId ? childPhotoUrl(child.id, child.photoFileId) : null;
+}
 
 export function GradeChildrenList({
   gradeId,
@@ -131,7 +137,7 @@ export function GradeChildrenList({
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
-                        <Avatar name={r.child.fullName} size="sm" />
+                        <Avatar name={r.child.fullName} src={photoOf(r.child)} size="sm" />
                         <span className="font-semibold text-ink">{r.child.fullName}</span>
                         {!r.child.isActive && <Badge tone="neutral">غير نشط</Badge>}
                       </div>
@@ -160,7 +166,7 @@ export function GradeChildrenList({
                   href={`/children/${r.enrollmentId}`}
                   className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-border bg-surface p-3.5 active:scale-[0.99] transition-transform"
                 >
-                  <Avatar name={r.child.fullName} />
+                  <Avatar name={r.child.fullName} src={photoOf(r.child)} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <p className="truncate font-bold text-ink">{r.child.fullName}</p>

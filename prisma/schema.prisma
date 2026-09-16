@@ -129,6 +129,9 @@ model Child {
   notes            String?
   isActive         Boolean   @default(true)
 
+  /// معرّف ملف الصورة في الخزنة الخارجية — الصورة نفسها لا تُحفظ في قاعدة البيانات.
+  photoFileId String?
+
   phones      ChildPhone[]
   enrollments Enrollment[]
 

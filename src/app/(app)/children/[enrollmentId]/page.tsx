@@ -9,6 +9,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { ChildDetailActions } from "@/components/domain/ChildDetailActions";
+import { childPhotoUrl } from "@/lib/photo-client";
 import { formatArabicDate, formatShortDate, calculateAge, monthName } from "@/lib/utils";
 
 export async function generateMetadata({
@@ -46,7 +47,11 @@ export default async function ChildPage({ params }: { params: Promise<{ enrollme
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between animate-fade-in-up">
         <div className="flex items-center gap-3.5">
-          <Avatar name={child.fullName} size="lg" />
+          <Avatar
+            name={child.fullName}
+            src={child.photoFileId ? childPhotoUrl(child.id, child.photoFileId) : null}
+            size="lg"
+          />
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl font-extrabold text-ink sm:text-2xl">{child.fullName}</h1>
