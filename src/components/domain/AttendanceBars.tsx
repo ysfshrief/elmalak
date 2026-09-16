@@ -14,10 +14,13 @@ import type { AttendanceStat } from "@/lib/attendance-stats";
 export function AttendanceBars({
   stats,
   pointsEnabled,
+  animate,
   emptyMessage = "لا توجد بيانات حضور بعد",
 }: {
   stats: AttendanceStat[];
   pointsEnabled: boolean;
+  /** نموّ الأعمدة من الصفر عند أول ظهور، واحدًا بعد الآخر. */
+  animate?: boolean;
   emptyMessage?: string;
 }) {
   const [openId, setOpenId] = React.useState<string | null>(null);
@@ -28,7 +31,7 @@ export function AttendanceBars({
 
   return (
     <ul className="space-y-1">
-      {stats.map((stat) => {
+      {stats.map((stat, index) => {
         const open = openId === stat.id;
         const recorded = stat.rate !== null;
 
@@ -61,8 +64,14 @@ export function AttendanceBars({
               {/* المسار خافت والعمود رفيع: البيانات هي ما يُرى، لا الزينة. */}
               <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-border/70">
                 <div
-                  className="h-full rounded-full bg-primary transition-[width] duration-500 ease-out"
-                  style={{ width: recorded ? `${Math.max(stat.rate ?? 0, 1.5)}%` : "0%" }}
+                  className={cn(
+                    "h-full rounded-full bg-primary transition-[width] duration-500 ease-out",
+                    animate && "animate-bar-grow"
+                  )}
+                  style={{
+                    width: recorded ? `${Math.max(stat.rate ?? 0, 1.5)}%` : "0%",
+                    animationDelay: animate ? `${index * 90}ms` : undefined,
+                  }}
                 />
               </div>
 

@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Users, ClipboardCheck, HeartHandshake, Cake, UserPlus, Network } from "lucide-react";
+import { Users, ClipboardCheck, HeartHandshake, Cake, UserPlus, Network, ChartColumn } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getDashboardData, getVisibleHierarchy } from "@/lib/queries";
+import { getAttendanceTrend, getAttendanceOverview } from "@/lib/attendance-stats";
+import { AttendanceTrendChart } from "@/components/domain/AttendanceTrendChart";
+import { AttendanceBars } from "@/components/domain/AttendanceBars";
 import { roleLabel } from "@/lib/roles";
 import { StatCard } from "@/components/ui/StatCard";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
@@ -19,7 +22,18 @@ function greeting() {
 
 export default async function DashboardPage() {
   const user = await requireUser();
-  const [data, stages] = await Promise.all([getDashboardData(user), getVisibleHierarchy(user)]);
+  const [data, stages, trend, overview] = await Promise.all([
+    getDashboardData(user),
+    getVisibleHierarchy(user),
+    getAttendanceTrend(user),
+    getAttendanceOverview(user),
+  ]);
+
+  // أعلى الصفوف نسبةً، وما لم يُسجَّل له شيء لا يزاحم ما سُجّل.
+  const topGrades = overview.grades
+    .filter((g) => g.rate !== null)
+    .sort((a, b) => (b.rate ?? 0) - (a.rate ?? 0))
+    .slice(0, 5);
 
   const grades = stages.flatMap((s) => s.divisions.flatMap((d) => d.grades));
   const singleGrade = grades.length === 1 ? grades[0]! : null;
@@ -52,6 +66,40 @@ export default async function DashboardPage() {
           tone="info"
         />
       </div>
+
+      <Card className="animate-fade-in-up">
+        <CardHeader className="flex-wrap">
+          <CardTitle>منحنى الحضور</CardTitle>
+          <Link href="/statistics" className="text-sm font-semibold text-primary hover:underline">
+            كل الإحصائيات
+          </Link>
+        </CardHeader>
+        <CardContent>
+          {trend.points.length === 0 ? (
+            <EmptyState
+              icon={ChartColumn}
+              title="لم يُسجَّل حضور بعد"
+              description="سجّل أول اجتماع وسيرسم المنحنى نفسه هنا"
+            />
+          ) : (
+            <AttendanceTrendChart trend={trend} />
+          )}
+        </CardContent>
+      </Card>
+
+      {topGrades.length > 0 && (
+        <Card className="animate-fade-in-up">
+          <CardHeader className="flex-wrap">
+            <CardTitle>أعلى الصفوف حضورًا</CardTitle>
+            <Link href="/statistics" className="text-sm font-semibold text-primary hover:underline">
+              الكل
+            </Link>
+          </CardHeader>
+          <CardContent>
+            <AttendanceBars stats={topGrades} pointsEnabled={overview.points.enabled} animate />
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="animate-fade-in-up">
         <CardHeader>

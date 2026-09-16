@@ -86,7 +86,7 @@ export default async function StatisticsPage() {
                 <CardTitle>حسب المرحلة</CardTitle>
               </CardHeader>
               <CardContent>
-                <AttendanceBars stats={overview.stages} pointsEnabled={points.enabled} />
+                <AttendanceBars stats={overview.stages} pointsEnabled={points.enabled} animate />
               </CardContent>
             </Card>
           )}
@@ -97,7 +97,7 @@ export default async function StatisticsPage() {
               <p className="text-xs text-ink-faint">اضغط على أي صف لتفصيل أرقامه</p>
             </CardHeader>
             <CardContent>
-              <AttendanceBars stats={grades} pointsEnabled={points.enabled} />
+              <AttendanceBars stats={grades} pointsEnabled={points.enabled} animate />
             </CardContent>
           </Card>
 
