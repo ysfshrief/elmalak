@@ -36,11 +36,23 @@ export const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-/** Subset shown in the mobile bottom nav (max 5 for touch ergonomics). */
+/**
+ * الأربعة التي تشغل شريط الهاتف السفلي، والخانة الخامسة لزرّ «المزيد».
+ *
+ * الشريط لا يتسع لكل شيء، لكن ما لا يتسع له لا يجوز أن يصير غير موجود:
+ * كل ما ليس هنا يظهر في لوحة «المزيد»، فلا تبقى صفحةٌ لا يُوصل إليها إلا
+ * بكتابة رابطها.
+ */
 export const MOBILE_NAV_HREFS = [
   "/dashboard",
   "/hierarchy",
   "/attendance",
   "/visitation",
-  "/birthdays",
 ];
+
+/** ما عدا ذلك — يُعرض في لوحة «المزيد» على الهاتف. */
+export function mobileOverflowItems(role: Role) {
+  return NAV_ITEMS.filter(
+    (item) => !MOBILE_NAV_HREFS.includes(item.href) && (!item.roles || item.roles.includes(role))
+  );
+}

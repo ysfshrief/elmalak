@@ -64,12 +64,14 @@ export const ChildPhotoField = React.forwardRef<
   const [progress, setProgress] = React.useState(0);
   const [error, setError] = React.useState<string | null>(null);
 
+  // إلغاء الرفع عند مغادرة الحقل فقط. وكان هذا مربوطًا بتغيّر المعاينة، فكان
+  // ضبطُ معاينة الصورة الجديدة يُجهض الرفع الذي بدأ لتوّه.
+  React.useEffect(() => () => uploadRef.current?.abort(), []);
+
   // روابط المعاينة المؤقتة تُحرَّر، وإلا بقيت الصور في الذاكرة.
   React.useEffect(() => {
-    return () => {
-      if (preview) URL.revokeObjectURL(preview);
-      uploadRef.current?.abort();
-    };
+    if (!preview) return;
+    return () => URL.revokeObjectURL(preview);
   }, [preview]);
 
   const shownSrc = preview ?? (version && childId ? childPhotoUrl(childId, version) : null);

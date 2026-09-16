@@ -9,10 +9,10 @@ import { SearchInput } from "@/components/ui/SearchInput";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { EmptyState } from "@/components/ui/States";
-import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Input, Label } from "@/components/ui/Input";
 import { ChildForm } from "@/components/domain/ChildForm";
+import { PhotoThumb } from "@/components/domain/PhotoThumb";
 import { setGradeFamilyNameAction } from "@/actions/structure";
 import { deleteChildAction } from "@/actions/children";
 import { DeletableRow, LongPressHint } from "@/components/ui/DeleteGesture";
@@ -164,7 +164,7 @@ export function GradeChildrenList({
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
-                        <Avatar name={r.child.fullName} src={photoOf(r.child)} size="sm" />
+                        <PhotoThumb name={r.child.fullName} src={photoOf(r.child)} size="sm" />
                         <span className="font-semibold text-ink">{r.child.fullName}</span>
                         {!r.child.isActive && <Badge tone="neutral">غير نشط</Badge>}
                       </div>
@@ -200,7 +200,7 @@ export function GradeChildrenList({
                   href={`/children/${r.enrollmentId}`}
                   className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-border bg-surface p-3.5 active:scale-[0.99] transition-transform"
                 >
-                  <Avatar name={r.child.fullName} src={photoOf(r.child)} />
+                  <PhotoThumb name={r.child.fullName} src={photoOf(r.child)} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <p className="truncate font-bold text-ink">{r.child.fullName}</p>

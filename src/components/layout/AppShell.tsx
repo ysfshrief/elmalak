@@ -25,7 +25,7 @@ export function AppShell({
           <Footer />
         </main>
       </div>
-      <BottomNav />
+      <BottomNav role={role} />
     </div>
   );
 }
