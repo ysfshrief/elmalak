@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Trash2 } from "lucide-react";
+import { Trash2, MoreVertical } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Button } from "@/components/ui/Button";
@@ -27,6 +27,15 @@ import { cn } from "@/lib/utils";
  *     الرابط، أو سحبه. أيّها سبقنا ألغى إيماءتنا (`pointercancel`). فنُعطّل تلك
  *     السلوكيات على الصفّ ونسبقها بوقتٍ أقصر.
  *  ٣) الإصبع يهتزّ. تسامحٌ بعشر بكسلات كافٍ للفأرة وضيّقٌ على اللمس.
+ *
+ * ولأن اللمس يختلف بين متصفّحٍ وآخر — وبعضها يُلغي مؤشّر اللمس (`pointercancel`)
+ * لمجرّد أنه رجّح أن ما يجري تمرير — لا تُبنى إيماءةُ اللمس على أحداث المؤشّر
+ * أصلًا، بل على أحداث اللمس نفسها: تبدأ بـ`touchstart` وتنتهي بـ`touchend` أو
+ * بحركةٍ تتجاوز التسامح. والفأرة والقلم على مسار المؤشّر كما كانا.
+ *
+ * ومع هذا كلّه تبقى الإيماءة مخفيّة، والمخفيّ لا يُعتمد عليه وحده: كل صفٍّ
+ * يحمل زرّ «⋮» ظاهرًا يفتح اللوحة نفسها. الإيماءة سرعةٌ لمن يعرفها، والزرّ
+ * طريقٌ لمن لا يعرفها أو خذله متصفّحه.
  */
 
 const HOLD_MS = 420;
@@ -80,36 +89,62 @@ export function useDeleteGesture({
     navigator.vibrate?.(12);
   }, [cancel]);
 
+  const begin = React.useCallback(
+    (x: number, y: number, tolerance: number) => {
+      swallowClick.current = false;
+      origin.current = { x, y, tolerance };
+      setHolding(true);
+      timer.current = setTimeout(() => {
+        swallowClick.current = true;
+        open();
+      }, HOLD_MS);
+    },
+    [open]
+  );
+
+  const movedTooFar = React.useCallback(
+    (x: number, y: number) => {
+      const start = origin.current;
+      if (!start) return;
+      if (Math.abs(x - start.x) > start.tolerance || Math.abs(y - start.y) > start.tolerance) cancel();
+    },
+    [cancel]
+  );
+
   const handlers = disabled
     ? {}
     : {
+        // الفأرة والقلم فقط — اللمس له مساره أدناه.
         onPointerDown: (event: React.PointerEvent) => {
-          // الزرّ الأيمن ووسط الفأرة لهما مسارهما، والضغط المطوّل للمس والإصبع.
+          if (event.pointerType === "touch") return;
           if (event.button !== 0) return;
-          swallowClick.current = false;
-          origin.current = {
-            x: event.clientX,
-            y: event.clientY,
-            tolerance:
-              event.pointerType === "touch" ? MOVE_TOLERANCE_PX.touch : MOVE_TOLERANCE_PX.other,
-          };
-          setHolding(true);
-          timer.current = setTimeout(() => {
-            swallowClick.current = true;
-            open();
-          }, HOLD_MS);
+          begin(event.clientX, event.clientY, MOVE_TOLERANCE_PX.other);
         },
         onPointerMove: (event: React.PointerEvent) => {
-          const start = origin.current;
-          if (!start) return;
-          const moved =
-            Math.abs(event.clientX - start.x) > start.tolerance ||
-            Math.abs(event.clientY - start.y) > start.tolerance;
-          if (moved) cancel();
+          if (event.pointerType === "touch") return;
+          movedTooFar(event.clientX, event.clientY);
         },
-        onPointerUp: cancel,
-        onPointerLeave: cancel,
-        onPointerCancel: cancel,
+        onPointerUp: (event: React.PointerEvent) => {
+          if (event.pointerType !== "touch") cancel();
+        },
+        onPointerLeave: (event: React.PointerEvent) => {
+          if (event.pointerType !== "touch") cancel();
+        },
+        onPointerCancel: (event: React.PointerEvent) => {
+          if (event.pointerType !== "touch") cancel();
+        },
+        // اللمس: أحداثه وحدها، فلا يُلغيها ترجيحُ المتصفّح أن ما يجري تمرير.
+        onTouchStart: (event: React.TouchEvent) => {
+          const touch = event.touches[0];
+          if (!touch || event.touches.length > 1) return;
+          begin(touch.clientX, touch.clientY, MOVE_TOLERANCE_PX.touch);
+        },
+        onTouchMove: (event: React.TouchEvent) => {
+          const touch = event.touches[0];
+          if (touch) movedTooFar(touch.clientX, touch.clientY);
+        },
+        onTouchEnd: cancel,
+        onTouchCancel: cancel,
         // في طور الالتقاط، فتُمنع النقرة قبل أن تصل إلى الرابط في الداخل.
         onClickCapture: (event: React.MouseEvent) => {
           if (!swallowClick.current) return;
@@ -191,6 +226,7 @@ export function DeletableRow({
   onDelete,
   onClick,
   disabled,
+  menu,
   className,
   children,
 }: {
@@ -200,15 +236,21 @@ export function DeletableRow({
   onDelete: () => Promise<void>;
   onClick?: () => void;
   disabled?: boolean;
+  /**
+   * زرّ «⋮» ظاهرٌ يفتح اللوحة نفسها. يُطلب حيث لا يوجد زرّ حذفٍ آخر في الصف،
+   * فلا يبقى الحذف معلّقًا بإيماءةٍ مخفيّة قد لا يعرفها المستخدم.
+   */
+  menu?: boolean;
   className?: string;
   children: React.ReactNode;
 }) {
-  const { handlers, dialogs, armed, holding, gestureStyle } = useDeleteGesture({
+  const { handlers, dialogs, armed, holding, gestureStyle, openSheet } = useDeleteGesture({
     name,
     description,
     onDelete,
     disabled,
   });
+  const showMenu = menu && !disabled && Tag !== "tr";
 
   return (
     <Tag
@@ -217,6 +259,7 @@ export function DeletableRow({
       className={cn(
         // ردّ فعلٍ فوريّ على الضغطة: بلا هذا لا يعرف الإصبعُ أن شيئًا يحدث.
         "transition-[transform,background-color] duration-200 ease-out",
+        showMenu && "relative",
         holding && "bg-primary-soft/40",
         holding && Tag !== "tr" && "scale-[0.98]",
         className
@@ -226,6 +269,24 @@ export function DeletableRow({
       data-holding={holding || undefined}
     >
       {children}
+      {showMenu && (
+        <button
+          type="button"
+          aria-label={`خيارات ${name}`}
+          onClick={(event) => {
+            // الصفّ كلّه رابطٌ أو قابلٌ للنقر، فلا تصل النقرة إليه.
+            event.preventDefault();
+            event.stopPropagation();
+            openSheet();
+          }}
+          className={cn(
+            "absolute end-1 top-1/2 z-10 flex size-9 -translate-y-1/2 items-center justify-center",
+            "rounded-full text-ink-faint transition-colors hover:bg-bg-alt hover:text-ink active:bg-bg-alt"
+          )}
+        >
+          <MoreVertical className="size-4.5" aria-hidden />
+        </button>
+      )}
       {dialogs}
     </Tag>
   );

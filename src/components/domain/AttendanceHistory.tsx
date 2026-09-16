@@ -22,7 +22,7 @@ export function AttendanceHistory({
 
   return (
     <>
-      <LongPressHint>اضغط مطوّلًا على أي اجتماع لحذفه</LongPressHint>
+      <LongPressHint>للحذف: اضغط مطوّلًا على الاجتماع، أو افتح زرّ النقاط الثلاث بجانبه</LongPressHint>
       <ul className="mt-2 divide-y divide-border">
         {sessions.map((session) => (
           <DeletableRow
@@ -39,11 +39,12 @@ export function AttendanceHistory({
                 throw e;
               }
             }}
+            menu
             className="data-[armed]:bg-error-soft/40"
           >
             <Link
               href={`/attendance/${gradeId}?date=${session.date}`}
-              className="flex items-center justify-between py-2.5 text-sm hover:text-primary"
+              className="flex items-center justify-between py-2.5 pe-9 text-sm hover:text-primary"
             >
               <span className={cn(session.date === activeDate ? "font-bold text-primary" : "text-ink")}>
                 {formatArabicDate(session.date)}

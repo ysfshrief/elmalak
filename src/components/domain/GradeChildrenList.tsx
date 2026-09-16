@@ -138,7 +138,7 @@ export function GradeChildrenList({
         />
       ) : (
         <>
-          {canDelete && <LongPressHint>اضغط مطوّلًا على أي مخدوم لحذفه</LongPressHint>}
+          {canDelete && <LongPressHint>للحذف: اضغط مطوّلًا على المخدوم، أو افتح زرّ النقاط الثلاث بجانبه</LongPressHint>}
           <div className="hidden overflow-hidden rounded-[var(--radius-lg)] border border-border sm:block">
             <table className="w-full text-sm">
               <thead className="bg-bg-alt text-ink-muted">
@@ -193,12 +193,13 @@ export function GradeChildrenList({
                 name={r.child.fullName}
                 description={deleteDescription(r.child.fullName)}
                 disabled={!canDelete}
+                menu
                 onDelete={() => removeChild(r.enrollmentId, r.child.fullName)}
                 className="rounded-[var(--radius-lg)] data-[armed]:ring-2 data-[armed]:ring-error"
               >
                 <Link
                   href={`/children/${r.enrollmentId}`}
-                  className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-border bg-surface p-3.5 active:scale-[0.99] transition-transform"
+                  className={`flex items-center gap-3 rounded-[var(--radius-lg)] border border-border bg-surface p-3.5 transition-transform active:scale-[0.99] ${canDelete ? "pe-11" : ""}`}
                 >
                   <PhotoThumb name={r.child.fullName} src={photoOf(r.child)} />
                   <div className="min-w-0 flex-1">
