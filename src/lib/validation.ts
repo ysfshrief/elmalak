@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isFuture, parseISODateString } from "@/lib/dates";
+import { isSafeLocationUrl } from "@/lib/location";
 
 /**
  * تاريخ ميلاد اختياري: إمّا فارغ، وإمّا يومٌ موجود فعلًا في التقويم وليس في
@@ -34,6 +35,19 @@ export const phoneSchema = z.object({
     .regex(/^[0-9+\s-]+$/, "رقم التليفون يجب أن يحتوي على أرقام فقط"),
 });
 
+/**
+ * رابط الموقع: إمّا فارغ وإمّا رابطٌ صحيح بـ‎http/https. والقصر على هذين
+ * البروتوكولين تحقّقٌ أمني لا شكلي — الرابط يُوضع في وسم `<a>` ويُضغط.
+ */
+export const locationUrlSchema = z
+  .string()
+  .trim()
+  .refine((value) => value === "" || isSafeLocationUrl(value), {
+    message: "أدخل رابطًا صحيحًا يبدأ بـ http أو https",
+  })
+  .optional()
+  .or(z.literal(""));
+
 export const childSchema = z.object({
   fullName: z.string().trim().min(2, "اسم المخدوم مطلوب"),
   gradeId: z.string().min(1, "اختر الصف"),
@@ -43,6 +57,7 @@ export const childSchema = z.object({
   school: z.string().trim().optional().or(z.literal("")),
   confessionFather: z.string().trim().optional().or(z.literal("")),
   notes: z.string().trim().optional().or(z.literal("")),
+  locationUrl: locationUrlSchema,
   phones: z.array(phoneSchema),
 });
 

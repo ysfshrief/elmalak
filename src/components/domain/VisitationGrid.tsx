@@ -7,8 +7,9 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Textarea } from "@/components/ui/Input";
 import { cn } from "@/lib/utils";
 import { setVisitationAction } from "@/actions/visitation";
+import { LocationLink } from "@/components/domain/ChildLocation";
 
-type Row = { enrollmentId: string; fullName: string };
+type Row = { enrollmentId: string; fullName: string; locationUrl: string | null };
 type Entry = { visited: boolean; note: string };
 
 export function VisitationGrid({
@@ -78,6 +79,9 @@ export function VisitationGrid({
               <div className="flex items-center gap-3">
                 <Avatar name={m.fullName} size="sm" />
                 <span className="flex-1 truncate font-semibold text-ink">{m.fullName}</span>
+
+                {/* الافتقاد زيارةٌ إلى بيت، فالموقع هنا في موضعه لا زينة. */}
+                {m.locationUrl && <LocationLink url={m.locationUrl} compact />}
 
                 <button
                   type="button"

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, MapPin, School, Cross, Cake, ClipboardCheck, HeartHandshake } from "lucide-react";
+import { ChevronLeft, MapPin, School, Cross, Cake, ClipboardCheck, HeartHandshake, Navigation } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getEnrollmentDetail, getChildAttendanceStats, getVisitationHistory } from "@/lib/queries";
 import { getChildAttendanceSummary } from "@/lib/attendance-stats";
@@ -10,6 +10,7 @@ import { ChildPhotoAvatar } from "@/components/domain/ChildPhotoAvatar";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { ChildDetailActions } from "@/components/domain/ChildDetailActions";
+import { ChildLocationCard } from "@/components/domain/ChildLocation";
 import { childPhotoUrl } from "@/lib/photo-client";
 import { formatArabicDate, formatShortDate, calculateAge, monthName } from "@/lib/utils";
 
@@ -117,6 +118,18 @@ export default async function ChildPage({ params }: { params: Promise<{ enrollme
         </Card>
 
         <div className="space-y-4">
+          <Card className="animate-fade-in-up">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Navigation className="size-4.5 text-primary" />
+                اللوكيشن
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ChildLocationCard enrollmentId={enrollment.id} locationUrl={child.locationUrl} />
+            </CardContent>
+          </Card>
+
           <Card className="animate-fade-in-up">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

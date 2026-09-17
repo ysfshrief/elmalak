@@ -16,6 +16,7 @@ import { PhotoThumb } from "@/components/domain/PhotoThumb";
 import { setGradeFamilyNameAction } from "@/actions/structure";
 import { deleteChildAction } from "@/actions/children";
 import { DeletableRow, LongPressHint } from "@/components/ui/DeleteGesture";
+import { LocationLink } from "@/components/domain/ChildLocation";
 import { childPhotoUrl } from "@/lib/photo-client";
 import { formatArabicDate, calculateAge } from "@/lib/utils";
 
@@ -24,6 +25,7 @@ type Row = {
   child: {
     id: string;
     photoPath: string | null;
+    locationUrl: string | null;
     fullName: string;
     birthDate: Date | null;
     school: string | null;
@@ -32,6 +34,17 @@ type Row = {
     phones: { id: string; label: string; number: string }[];
   };
 };
+
+/**
+ * الأزرار المطلّة على البطاقة (⋮ والدبّوس) تعلو محتواها، فيُفسح لها بقدر ما
+ * يظهر منها فقط: بلا هذا يمرّ الاسم الطويل تحتها.
+ */
+function endPadding(canDelete: boolean, hasLocation: boolean) {
+  if (canDelete && hasLocation) return "pe-[5.25rem]";
+  if (canDelete) return "pe-11";
+  if (hasLocation) return "pe-11";
+  return "";
+}
 
 function photoOf(child: Row["child"]) {
   return child.photoPath ? childPhotoUrl(child.id, child.photoPath) : null;
@@ -176,6 +189,7 @@ export function GradeChildrenList({
                         <PhotoThumb name={r.child.fullName} src={photoOf(r.child)} size="sm" />
                         <span className="font-semibold text-ink">{r.child.fullName}</span>
                         {!r.child.isActive && <Badge tone="neutral">غير نشط</Badge>}
+                        {r.child.locationUrl && <LocationLink url={r.child.locationUrl} compact />}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-ink-muted tabular-nums">
@@ -204,11 +218,11 @@ export function GradeChildrenList({
                 disabled={!canDelete}
                 menu
                 onDelete={() => removeChild(r.enrollmentId, r.child.fullName)}
-                className="rounded-[var(--radius-lg)] data-[armed]:ring-2 data-[armed]:ring-error"
+                className="relative rounded-[var(--radius-lg)] data-[armed]:ring-2 data-[armed]:ring-error"
               >
                 <Link
                   href={`/children/${r.enrollmentId}`}
-                  className={`flex items-center gap-3 rounded-[var(--radius-lg)] border border-border bg-surface p-3.5 transition-transform active:scale-[0.99] ${canDelete ? "pe-11" : ""}`}
+                  className={`flex items-center gap-3 rounded-[var(--radius-lg)] border border-border bg-surface p-3.5 transition-transform active:scale-[0.99] ${endPadding(canDelete, !!r.child.locationUrl)}`}
                 >
                   <PhotoThumb name={r.child.fullName} src={photoOf(r.child)} />
                   <div className="min-w-0 flex-1">
@@ -238,6 +252,13 @@ export function GradeChildrenList({
                     </div>
                   </div>
                 </Link>
+                {r.child.locationUrl && (
+                  <LocationLink
+                    url={r.child.locationUrl}
+                    compact
+                    className={`absolute top-1/2 -translate-y-1/2 ${canDelete ? "end-11" : "end-1"}`}
+                  />
+                )}
               </DeletableRow>
             ))}
           </ul>

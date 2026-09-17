@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { assertGradeAccess, assertEnrollmentAccess } from "@/lib/scope";
 import { canDeleteChild } from "@/lib/roles";
 import { childSchema } from "@/lib/validation";
+import { isSafeLocationUrl } from "@/lib/location";
 import { getCurrentAcademicYear } from "@/lib/queries";
 import { deletePhoto } from "@/lib/photo-storage";
 import type { Gender } from "@prisma/client";
@@ -18,6 +19,7 @@ function childData(data: {
   school?: string;
   confessionFather?: string;
   notes?: string;
+  locationUrl?: string;
 }) {
   return {
     fullName: data.fullName,
@@ -27,6 +29,8 @@ function childData(data: {
     school: data.school || null,
     confessionFather: data.confessionFather || null,
     notes: data.notes || null,
+    // الرابط كما وصل: لا اختصار ولا تحويل ولا إضافة مزوّد.
+    locationUrl: data.locationUrl?.trim() || null,
   };
 }
 
@@ -105,6 +109,32 @@ export async function deleteChildAction(enrollmentId: string) {
   revalidatePath(`/grades/${enrollment.gradeId}`);
   revalidatePath("/dashboard");
   revalidatePath("/birthdays");
+}
+
+/**
+ * حفظ رابط الموقع وحده، دون المرور بنموذج البيانات كلّه.
+ *
+ * الحفظ والتعديل والحذف فعلٌ واحد: نصٌّ فارغ يعني «لا موقع». والتحقّق يُعاد
+ * هنا على الخادم مهما تحقّقت الواجهة — الواجهة تُسعِف المستخدم، والخادم يحمي
+ * البيانات، ولا ينوب أحدهما عن الآخر.
+ */
+export async function setChildLocationAction(enrollmentId: string, locationUrl: string) {
+  const user = await requireUser();
+  const enrollment = await assertEnrollmentAccess(user, enrollmentId);
+
+  const value = (locationUrl ?? "").trim();
+  if (value && !isSafeLocationUrl(value)) {
+    throw new Error("أدخل رابطًا صحيحًا يبدأ بـ http أو https");
+  }
+
+  await prisma.child.update({
+    where: { id: enrollment.childId },
+    data: { locationUrl: value || null },
+  });
+
+  revalidatePath(`/children/${enrollmentId}`);
+  revalidatePath(`/grades/${enrollment.gradeId}`);
+  revalidatePath(`/visitation/${enrollment.gradeId}`);
 }
 
 export async function toggleChildActiveAction(enrollmentId: string, isActive: boolean) {

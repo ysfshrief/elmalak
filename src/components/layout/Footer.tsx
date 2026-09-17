@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+
 /**
  * تذييل ثابت في كل صفحات الموقع.
  *
@@ -7,7 +9,12 @@
 export function Footer({ className }: { className?: string }) {
   return (
     <footer
-      className={`border-t border-border px-4 py-5 text-center text-xs leading-relaxed text-ink-faint ${className ?? ""}`}
+      // ‎cn‎ لا الدمجُ النصّي: صفحةٌ بخلفيةٍ داكنة تحتاج لونًا آخر للنصّ، والصنفان
+      // المتعارضان يُحسمان بترتيب ورقة الأنماط لا بترتيب كتابتهما.
+      className={cn(
+        "border-t border-border px-4 py-5 text-center text-xs leading-relaxed text-ink-faint",
+        className
+      )}
     >
       <p>© جميع الحقوق محفوظة لكنيسة رئيس الملائكة الجليل ميخائيل بدمنهور</p>
       <p className="mt-1" dir="ltr">

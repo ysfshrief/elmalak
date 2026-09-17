@@ -138,6 +138,9 @@ model Child {
   /// مسار الصورة في خزنة الملفات — الصورة نفسها لا تُحفظ في قاعدة البيانات.
   photoPath String?
 
+  /// رابط موقع المخدوم كما شاركه صاحبه (خرائط جوجل أو غيرها)، يُحفظ كما هو.
+  locationUrl String?
+
   phones      ChildPhone[]
   enrollments Enrollment[]
 

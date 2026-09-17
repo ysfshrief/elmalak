@@ -31,6 +31,7 @@ export function ChildForm({
     fullName: string;
     gender: string | null;
     address: string | null;
+    locationUrl?: string | null;
     birthDate: Date | null;
     school: string | null;
     confessionFather: string | null;
@@ -54,6 +55,7 @@ export function ChildForm({
       gradeId,
       gender: (child?.gender ?? "") as FormValues["gender"],
       address: child?.address ?? "",
+      locationUrl: child?.locationUrl ?? "",
       // ‎toISOString‎ يعطي يوم UTC، وهو نفس اليوم المخزَّن — لا يوم الخادم المحلّي.
       birthDate: child?.birthDate ? child.birthDate.toISOString().slice(0, 10) : "",
       school: child?.school ?? "",
@@ -142,6 +144,23 @@ export function ChildForm({
       <div>
         <Label htmlFor="address">العنوان</Label>
         <Textarea id="address" rows={2} {...register("address")} placeholder="العنوان بالتفصيل" />
+      </div>
+
+      <div>
+        <Label htmlFor="locationUrl">لوكيشن المخدوم (رابط)</Label>
+        <Input
+          id="locationUrl"
+          dir="ltr"
+          inputMode="url"
+          {...register("locationUrl")}
+          error={!!errors.locationUrl}
+          placeholder="https://maps.app.goo.gl/..."
+        />
+        <FieldError>{errors.locationUrl?.message}</FieldError>
+        <p className="mt-1.5 text-xs text-ink-faint">
+          الصق رابط الموقع المشارَك كما هو — يُحفظ بلا تغيير ويُفتح بتطبيق الخرائط الذي
+          يختاره جهازك.
+        </p>
       </div>
 
       <div>

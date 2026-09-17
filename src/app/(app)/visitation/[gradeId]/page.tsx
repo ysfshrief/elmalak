@@ -67,7 +67,11 @@ export default async function VisitationGradePage({
             key={`${year}-${month}`}
             year={year}
             month={month}
-            rows={rows.map((r) => ({ enrollmentId: r.enrollment.id, fullName: r.child.fullName }))}
+            rows={rows.map((r) => ({
+              enrollmentId: r.enrollment.id,
+              fullName: r.child.fullName,
+              locationUrl: r.child.locationUrl,
+            }))}
             initialEntries={initialEntries}
           />
         </CardContent>
