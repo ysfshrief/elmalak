@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { roleLabel, canDeleteChild, canManageUsers } from "@/lib/roles";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { GestureProbe } from "@/components/domain/GestureProbe";
+import { readFingerprints } from "@/lib/assetlinks";
 
 export const metadata: Metadata = { title: "فحص الجهاز" };
 
@@ -22,6 +23,8 @@ export const metadata: Metadata = { title: "فحص الجهاز" };
  */
 export default async function DiagnosticsPage() {
   const user = await getCurrentUser();
+  const androidPackage = process.env.ANDROID_PACKAGE_NAME?.trim() || "com.khedmetelmalak.app";
+  const android = readFingerprints(process.env.ANDROID_CERT_SHA256);
   const commit = process.env.APP_COMMIT || "غير معروف";
   const message = process.env.APP_COMMIT_MSG || "—";
   const builtAt = process.env.APP_BUILT_AT || "—";
@@ -75,6 +78,44 @@ export default async function DiagnosticsPage() {
           ) : (
             <p className="text-ink-muted">لست داخلًا بأي حساب على هذا الجهاز.</p>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>٣) ربط تطبيق أندرويد</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-1.5 text-sm">
+          <Row label="اسم الحزمة" value={androidPackage} mono />
+          <Row
+            label="البصمة المضبوطة على الموقع"
+            value={android.valid[0] ?? "— لا توجد —"}
+            mono
+          />
+          {android.valid.length > 1 && (
+            <Row label="بصمات إضافية" value={String(android.valid.length - 1)} />
+          )}
+          {android.rejected.length > 0 && (
+            <Row label="قيمة أُدخلت وتعذّر فهمها" value={android.rejected.join(" · ")} mono />
+          )}
+          <Row
+            label="ملف الربط"
+            value={android.valid.length ? "يُخدَم ببصمة" : "يُخدَم فارغًا []"}
+          />
+          <p className="pt-2 text-xs text-ink-faint">
+            شريط العنوان داخل التطبيق يختفي فقط حين تطابق البصمةُ هنا بصمةَ التطبيق المثبَّت
+            على الجهاز. فإن كانت هنا «لا توجد» فالمتغيّر <code>ANDROID_CERT_SHA256</code> لم يصل
+            إلى بيئة الإنتاج. وإن كانت موجودةً ومختلفةً عن بصمة التطبيق الذي ثبّتَّه، فالتحقّق
+            يفشل بلا رسالة.{" "}
+            <a
+              href="/.well-known/assetlinks.json"
+              className="font-semibold text-primary hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              افتح ملف الربط كما يقرأه كروم
+            </a>
+          </p>
         </CardContent>
       </Card>
 
