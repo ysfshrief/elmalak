@@ -1,6 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  مسارات مزوّد الملفات.
+
+  ‏`twa_splash` هو الأهمّ: مكتبةُ النافذة الموثوقة تكتب صورةَ شاشة البدء في
+  ‏`files/twa_splash/` ثم تُسلّمها إلى كروم عبر هذا المزوّد. وإن لم يكن المسار
+  معلنًا هنا، رمى `FileProvider` استثناءً وقتَ الإقلاع — فتظهر شاشةُ البدء ثم
+  يُغلق التطبيق فورًا. وهذا بالضبط ما كان يحدث.
+
+  وأُعلن جذرُ `files/` كلّه أيضًا احتياطًا: المزوّد غيرُ مُصدَّر ولا يمنح إلا ما
+  يُشارَك صراحةً، فإعلانُ الجذر لا يفتح شيئًا لأحد، ويقي من تغيّر اسم المجلّد.
+-->
 <paths>
-    <files-path name="downloads" path="downloads/" />
+    <files-path name="twa_splash" path="twa_splash/" />
+    <files-path name="app_files" path="." />
     <cache-path name="cache" path="." />
     <external-path name="external" path="." />
 </paths>

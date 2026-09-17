@@ -24,6 +24,9 @@ require(websiteUrl.startsWith("https://") && !websiteUrl.contains("REPLACE-WITH"
 val websiteHost: String = URI(websiteUrl).host
     ?: throw GradleException("WEBSITE_URL غير صالح: $websiteUrl")
 
+/** أصلُ الموقع (بروتوكول + نطاق) بلا مسار — هكذا يطلبه إعلانُ الربط. */
+val websiteOrigin: String = URI(websiteUrl).let { "${it.scheme}://${it.host}" }
+
 android {
     namespace = "com.khedmetelmalak.app"
     compileSdk = 35
@@ -32,13 +35,19 @@ android {
         applicationId = "com.khedmetelmalak.app"
         minSdk = 23
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
 
         // العنوان والنطاق يصلان إلى الموارد والبيان من مكانٍ واحد.
         resValue("string", "launch_url", websiteUrl)
-        resValue("string", "url_attendance", "${websiteUrl.trimEnd('/')}/attendance")
-        resValue("string", "url_visitation", "${websiteUrl.trimEnd('/')}/visitation")
+        // إعلانُ الربط كما يقرأه كروم: علاماتُ الاقتباس مهرَّبة لأنها تدخل
+        // ملفَّ موارد XML.
+        resValue(
+            "string",
+            "asset_statements",
+            "[{\\\"relation\\\": [\\\"delegate_permission/common.handle_all_urls\\\"], " +
+                "\\\"target\\\": {\\\"namespace\\\": \\\"web\\\", \\\"site\\\": \\\"$websiteOrigin\\\"}}]"
+        )
         manifestPlaceholders["hostName"] = websiteHost
     }
 

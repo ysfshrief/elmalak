@@ -9,7 +9,6 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- يُسأل عنه عند الحاجة فقط (رفع صورة المخدوم من الكاميرا). -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <!-- يسمح للتطبيق بسؤال النظام: أيّ متصفّحٍ يستطيع فتح نافذةٍ موثوقة؟ -->
@@ -27,6 +26,15 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.App"
         android:usesCleartextTraffic="false">
+
+        <!--
+          نصفُ الربط الذي يقع على التطبيق: يُعلن أنه يخصّ هذا الموقع. والنصف
+          الآخر على الموقع في ‎/.well-known/assetlinks.json‎. وباجتماعهما يخفي
+          كروم شريط العنوان.
+        -->
+        <meta-data
+            android:name="asset_statements"
+            android:resource="@string/asset_statements" />
 
         <activity
             android:name=".LauncherActivity"
@@ -57,24 +65,17 @@
             <meta-data
                 android:name="android.support.customtabs.trusted.SPLASH_SCREEN_FADE_OUT_DURATION"
                 android:value="300" />
+            <!-- عبرَ هذا المزوّد تُسلَّم صورةُ البدء إلى المتصفّح. -->
             <meta-data
                 android:name="android.support.customtabs.trusted.FILE_PROVIDER_AUTHORITY"
                 android:value="${applicationId}.fileprovider" />
-
-            <meta-data
-                android:name="android.app.shortcuts"
-                android:resource="@xml/shortcuts" />
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!--
-              روابط الموقع تفتح داخل التطبيق. و`autoVerify` يجعل أندرويد يقرأ
-              ‎/.well-known/assetlinks.json‎ من الموقع؛ فإن وجد بصمة التوقيع
-              اختفى شريطُ العنوان وصار التطبيق تطبيقًا لا متصفّحًا.
-            -->
+            <!-- روابط الموقع تفتح داخل التطبيق. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -83,17 +84,17 @@
             </intent-filter>
         </activity>
 
-        <!-- «إدارة مساحة التخزين» في إعدادات النظام تفتح بيانات الموقع. -->
-        <activity
-            android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
-            android:exported="true"
-            android:label="@string/manage_space">
-            <meta-data
-                android:name="android.support.customtabs.trusted.MANAGE_SPACE_URL"
-                android:value="@string/launch_url" />
-        </activity>
+        <!-- يُمكّن الموقعَ من إرسال إشعاراتٍ عبر التطبيق إن احتاج ذلك لاحقًا. -->
+        <service
+            android:name="com.google.androidbrowserhelper.trusted.DelegationService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
 
-        <!-- تنزيلاتُ الموقع تُسلَّم إلى تطبيقات الجهاز عبر هذا المزوّد. -->
+        <!-- تنزيلاتُ الموقع وصورةُ شاشة البدء تمرّان من هنا. -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
