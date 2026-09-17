@@ -8,7 +8,7 @@ const TABS = [
   { href: "/settings/users", label: "المستخدمون" },
   { href: "/settings/structure", label: "الهيكل التنظيمي" },
   { href: "/settings/points", label: "نقاط الحضور" },
-  { href: "/settings/diagnostics", label: "فحص الجهاز" },
+  { href: "/diag", label: "فحص الجهاز" },
 ];
 
 export function SettingsTabs() {

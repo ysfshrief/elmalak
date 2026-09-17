@@ -3,7 +3,9 @@ import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
 const COOKIE_NAME = "elmalak_session";
-const PUBLIC_PATHS = ["/login"];
+// صفحةُ الفحص عامّة عمدًا: يُحتاج إليها حين لا يستطيع المستخدم الدخول أو حين
+// لا تظهر له القائمة، وهي لا تعرض إلا رقم النسخة وما يخصّ جلسته هو.
+const PUBLIC_PATHS = ["/login", "/diag"];
 
 async function hasValidSession(request: NextRequest) {
   const token = request.cookies.get(COOKIE_NAME)?.value;

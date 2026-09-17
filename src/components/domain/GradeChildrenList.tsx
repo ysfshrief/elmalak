@@ -138,7 +138,16 @@ export function GradeChildrenList({
         />
       ) : (
         <>
-          {canDelete && <LongPressHint>للحذف: اضغط مطوّلًا على المخدوم، أو افتح زرّ النقاط الثلاث بجانبه</LongPressHint>}
+          {canDelete ? (
+            <LongPressHint>
+              للحذف: اضغط مطوّلًا على المخدوم، أو افتح زرّ النقاط الثلاث بجانبه
+            </LongPressHint>
+          ) : (
+            // غيابُ الزرّ بلا تفسير يُقرأ عطبًا. وذكرُ السبب يُنهي البحث عمّا لا وجود له.
+            <LongPressHint>
+              حذف المخدومين متاحٌ لمسؤول النظام وأمين الخدمة وأمين المرحلة فقط
+            </LongPressHint>
+          )}
           <div className="hidden overflow-hidden rounded-[var(--radius-lg)] border border-border sm:block">
             <table className="w-full text-sm">
               <thead className="bg-bg-alt text-ink-muted">
