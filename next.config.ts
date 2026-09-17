@@ -10,6 +10,19 @@ const build = {
 
 const nextConfig: NextConfig = {
   env: build,
+  async headers() {
+    return [
+      {
+        // عاملُ الخدمة لا يُخزَّن أبدًا: هو نفسه أداةُ التحديث، فلو خُزّن لَعَلِق
+        // المستخدمون على نسخةٍ قديمة من الموقع بلا سبيلٍ إلى إخراجهم منها.
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
+    ];
+  },
   // قارئا Excel و Word يعتمدان على وحدات Node، فيُتركان خارج حزمة البناء.
   serverExternalPackages: ["exceljs", "mammoth"],
   experimental: {

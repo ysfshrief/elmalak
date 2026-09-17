@@ -1,0 +1,102 @@
+<!doctype html>
+<!--
+  صفحةُ الانقطاع.
+
+  صفحةٌ ساكنة قائمة بذاتها: لا إطار عمل ولا حزم JavaScript ولا بيانات. والسبب
+  عمليّ — يعرضها عاملُ الخدمة تحت عنوان الصفحة المطلوبة، فلو كانت صفحةَ Next
+  لَاختلف ما في الصفحة عمّا يتوقّعه المتصفّح لذلك العنوان فانهار التطبيق. أمّا
+  صفحةٌ بلا شيء تعتمد عليه فتُعرض كما هي تحت أي عنوان.
+
+  ولا تحمل بياناتٍ لأحد: تُخزَّن على كل جهاز عند أول زيارة ناجحة.
+-->
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>غير متصل بالإنترنت</title>
+    <link rel="icon" href="/icons/icon-192.png" />
+    <style>
+      :root {
+        --bg: #f3ecda;
+        --surface: #ffffff;
+        --ink: #23271f;
+        --muted: #635c48;
+        --primary: #ab8324;
+        --contrast: #fffdf7;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #191f1c;
+          --surface: #1c2224;
+          --ink: #efe9d8;
+          --muted: #b3ab96;
+          --primary: #d7ac52;
+          --contrast: #1a1509;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        padding: 24px;
+        text-align: center;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: "Segoe UI", Tahoma, system-ui, sans-serif;
+      }
+      .badge {
+        width: 104px;
+        height: 104px;
+        display: grid;
+        place-items: center;
+        border-radius: 22px;
+        background: var(--surface);
+        box-shadow: 0 10px 30px rgba(35, 39, 31, 0.12);
+      }
+      .badge img { width: 84px; height: 84px; }
+      h1 { margin: 0; font-size: 1.5rem; }
+      p { margin: 10px 0 0; max-width: 24rem; font-size: 0.9rem; line-height: 1.7; color: var(--muted); }
+      button {
+        margin-top: 4px;
+        padding: 12px 28px;
+        font: inherit;
+        font-weight: 700;
+        color: var(--contrast);
+        background: var(--primary);
+        border: 0;
+        border-radius: 12px;
+      }
+      button:active { transform: scale(0.98); }
+      #back { margin-top: 10px; font-size: 0.8rem; font-weight: 700; color: #3f7d52; visibility: hidden; }
+    </style>
+  </head>
+  <body>
+    <div class="badge">
+      <img src="/logos/church-logo.png" alt="شعار كنيسة رئيس الملائكة الجليل ميخائيل بدمنهور" />
+    </div>
+
+    <div>
+      <h1>غير متصل بالإنترنت</h1>
+      <p>
+        هذه الصفحة لم تُفتح من قبل على هذا الجهاز، فلا توجد نسخةٌ محفوظة منها. أمّا الصفحات
+        التي زرتَها فتبقى متاحة. وسيعود كل شيء تلقائيًا بمجرّد رجوع الإنترنت.
+      </p>
+    </div>
+
+    <button type="button" onclick="location.reload()">إعادة المحاولة</button>
+    <p id="back">عاد الاتصال — جارٍ إعادة التحميل…</p>
+
+    <script>
+      // بمجرّد عودة الشبكة تُعاد المحاولة وحدها، فلا ينتظر المستخدم أمام صفحةٍ ميّتة.
+      addEventListener("online", function () {
+        document.getElementById("back").style.visibility = "visible";
+        setTimeout(function () { location.reload(); }, 800);
+      });
+    </script>
+  </body>
+</html>

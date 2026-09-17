@@ -14,7 +14,8 @@
     "db:studio": "prisma studio",
     "postinstall": "prisma generate && node scripts/prepare-ocr.mjs",
     "make:import-file": "tsx scripts/make-import-file.ts",
-    "check:photos": "NODE_OPTIONS=--conditions=react-server tsx scripts/check-photo-storage.ts"
+    "check:photos": "NODE_OPTIONS=--conditions=react-server tsx scripts/check-photo-storage.ts",
+    "icons": "node scripts/generate-icons.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

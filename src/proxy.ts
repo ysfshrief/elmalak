@@ -5,7 +5,10 @@ import { jwtVerify } from "jose";
 const COOKIE_NAME = "elmalak_session";
 // صفحةُ الفحص عامّة عمدًا: يُحتاج إليها حين لا يستطيع المستخدم الدخول أو حين
 // لا تظهر له القائمة، وهي لا تعرض إلا رقم النسخة وما يخصّ جلسته هو.
-const PUBLIC_PATHS = ["/login", "/diag"];
+// ‎/sw.js‎ و‎/manifest.webmanifest‎ يطلبهما المتصفّح قبل أي جلسة، و‎/offline‎
+// صفحةٌ بلا بيانات يعرضها عاملُ الخدمة حين تنقطع الشبكة. تحويلُ أيٍّ منها
+// إلى صفحة الدخول يكسر التثبيت والعمل دون اتصال.
+const PUBLIC_PATHS = ["/login", "/diag", "/sw.js", "/manifest.webmanifest", "/offline.html"];
 
 async function hasValidSession(request: NextRequest) {
   const token = request.cookies.get(COOKIE_NAME)?.value;
@@ -30,6 +33,8 @@ export async function proxy(request: NextRequest) {
     // ملفات محرّك القراءة الضوئية: برامج وبيانات لغة لا بيانات مخدومين،
     // ويطلبها عاملُ الخلفية في المتصفّح فلا يُعتمد على وصول الكعكة إليه.
     pathname.startsWith("/ocr/") ||
+    pathname.startsWith("/icons/") ||
+    pathname.startsWith("/.well-known/") ||
     pathname === "/favicon.ico";
 
   const authed = await hasValidSession(request);

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- الوضع الليلي بألوان الموقع الليلية. -->
+<resources>
+    <color name="colorPrimary">#D7AC52</color>
+    <color name="colorPrimaryDark">#1A1509</color>
+    <color name="backgroundColor">#14181A</color>
+</resources>

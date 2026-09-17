@@ -5,6 +5,16 @@ import { LogOut, ChevronDown } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { roleLabel } from "@/lib/roles";
 import { logoutAction } from "@/actions/auth";
+
+/**
+ * الخروج يمحو ما خُزّن على الجهاز للعمل دون اتصال.
+ *
+ * صفحاتُ التطبيق المخزونة تحمل أسماء المخدومين وبياناتهم، فلا يجوز أن تبقى
+ * على الجهاز بعد خروج صاحب الجلسة — قد يكون الجهاز مشتركًا.
+ */
+function clearOfflineCaches() {
+  navigator.serviceWorker?.controller?.postMessage({ type: "CLEAR_CACHES" });
+}
 import type { Role, Gender } from "@prisma/client";
 
 export function UserMenu({ name, role, gender }: { name: string; role: Role; gender: Gender | null }) {
@@ -44,7 +54,7 @@ export function UserMenu({ name, role, gender }: { name: string; role: Role; gen
             <p className="text-sm font-semibold text-ink">{name}</p>
             <p className="text-xs text-ink-faint">{roleLabel(role, gender)}</p>
           </div>
-          <form action={logoutAction}>
+          <form action={logoutAction} onSubmit={clearOfflineCaches}>
             <button
               type="submit"
               className="flex w-full items-center gap-2 px-3.5 py-3 text-sm font-medium text-error hover:bg-error-soft transition-colors"

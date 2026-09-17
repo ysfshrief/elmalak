@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- اسم التطبيق كما طلبه صاحبه، بلا ترجمة. -->
+    <string name="app_name" translatable="false">Khedmet El Malak</string>
+    <string name="manage_space">إدارة بيانات التطبيق</string>
+
+    <string name="shortcut_attendance">الحضور والغياب</string>
+    <string name="shortcut_visitation">الافتقاد</string>
+
+    <string name="offline_title">غير متصل بالإنترنت</string>
+    <string name="offline_body">يحتاج التطبيق إلى اتصالٍ بالإنترنت في أول مرة كي يحمّل الموقع. بعدها تبقى الصفحات التي فتحتَها متاحةً بلا اتصال.</string>
+    <string name="offline_retry">إعادة المحاولة</string>
+    <string name="offline_waiting">في انتظار الاتصال…</string>
+</resources>

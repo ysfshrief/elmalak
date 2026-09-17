@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Cairo } from "next/font/google";
 import { Toaster } from "sonner";
+import { ConnectionStatus } from "@/components/layout/ConnectionStatus";
 import "./globals.css";
 
 const cairo = Cairo({
@@ -17,6 +18,17 @@ export const metadata: Metadata = {
   },
   description:
     "منصة إدارة خدمة التربية الكنسية — كنيسة رئيس الملائكة الجليل ميخائيل بدمنهور",
+  // يجعل الموقع قابلًا للتثبيت، ويقرأه تطبيق أندرويد ليعرف اسمه وأيقونته.
+  manifest: "/manifest.webmanifest",
+  applicationName: "خدمة الملاك",
+  appleWebApp: { capable: true, title: "خدمة الملاك", statusBarStyle: "default" },
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/icons/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
@@ -40,6 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="min-h-full flex flex-col bg-bg text-ink antialiased">
+        <ConnectionStatus />
         {children}
         <Toaster
           position="top-center"

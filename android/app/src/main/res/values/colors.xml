@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ألوان الهوية نفسها المستعملة في الموقع (globals.css). -->
+<resources>
+    <color name="colorPrimary">#AB8324</color>
+    <color name="colorPrimaryDark">#6F5518</color>
+    <color name="backgroundColor">#FAF7EF</color>
+    <color name="ink">#23271F</color>
+    <color name="inkMuted">#635C48</color>
+</resources>
