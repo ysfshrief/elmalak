@@ -71,13 +71,16 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    // اسمٌ واضح للملف الناتج بدل app-release.apk.
-    applicationVariants.all {
-        outputs.all {
-            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
-                "Khedmet-El-Malak-${name}.apk"
-        }
-    }
+}
+
+/**
+ * ‏`kotlin-stdlib` منذ 1.8 استوعب `kotlin-stdlib-jdk7` و`jdk8`، فمن يجلب
+ * القديمَين مع الجديد تتكرّر عنده آلافُ الأصناف ويتوقّف البناء. ومكتبةُ
+ * المتصفّح تجلبهما بنسخةٍ قديمة، فيُستبعدان صراحةً.
+ */
+configurations.configureEach {
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jdk7")
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jdk8")
 }
 
 dependencies {
