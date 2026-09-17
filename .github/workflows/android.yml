@@ -45,14 +45,19 @@ jobs:
       - name: تحديد عنوان الموقع
         id: site
         run: |
+          # المصدر هو android/gradle.properties المحفوظ في المستودع. والمدخلُ
+          # اليدوي يعلوه عند الحاجة فقط (تجربة نسخة معاينة مثلًا).
           URL="${{ github.event.inputs.website_url }}"
-          if [ -z "$URL" ]; then URL="${{ vars.WEBSITE_URL }}"; fi
           if [ -z "$URL" ]; then
-            echo "::error::لم يُحدَّد عنوان الموقع. مرّره عند التشغيل أو اضبط المتغيّر WEBSITE_URL في Settings → Variables."
+            URL=$(grep -E '^WEBSITE_URL=' android/gradle.properties | cut -d= -f2-)
+          fi
+          if [ -z "$URL" ] || [[ "$URL" != https://* ]]; then
+            echo "::error::عنوان الموقع غير صالح: '$URL'"
             exit 1
           fi
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "سيُبنى التطبيق على: $URL"
+          echo "### الموقع: $URL" >> "$GITHUB_STEP_SUMMARY"
 
       - name: تجهيز مفتاح التوقيع (إن وُجد)
         id: signing
@@ -93,6 +98,46 @@ jobs:
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           echo "$SHA" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: التحقّق من صحّة الملف الناتج
+        run: |
+          set -e
+          APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -1)
+          BUILD_TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          echo "أدوات البناء: $BUILD_TOOLS"
+
+          echo "— توقيع الملف —"
+          "$BUILD_TOOLS/apksigner" verify --verbose "$APK"
+
+          echo "— بطاقة التطبيق —"
+          BADGING=$("$BUILD_TOOLS/aapt2" dump badging "$APK")
+          echo "$BADGING" | head -20
+
+          PKG=$(echo "$BADGING" | grep -oP "package: name='\K[^']+")
+          LABEL=$(echo "$BADGING" | grep -oP "application-label:'\K[^']+")
+          ICON=$(echo "$BADGING" | grep -oP "application-icon-320:'\K[^']+" || true)
+
+          test "$PKG" = "com.khedmetelmalak.app" || { echo "::error::معرّف الحزمة غير متوقّع: $PKG"; exit 1; }
+          test "$LABEL" = "Khedmet El Malak" || { echo "::error::اسم التطبيق غير متوقّع: $LABEL"; exit 1; }
+
+          echo "— العنوان داخل الملف —"
+          "$BUILD_TOOLS/aapt2" dump strings "$APK" | grep -i "elmalak-sillk" | head -3 \
+            || { echo "::error::عنوان الموقع غير موجود داخل الملف"; exit 1; }
+
+          echo "— لا نسخة من الموقع بداخله —"
+          if unzip -l "$APK" | grep -E "assets/.*\.(html|js)$" ; then
+            echo "::error::يحتوي الملف على صفحات موقع — التطبيق يجب أن يكون غلافًا فقط"; exit 1
+          fi
+          echo "لا توجد صفحات موقع داخل الملف ✓"
+
+          {
+            echo "### التحقّق"
+            echo "- معرّف الحزمة: \`$PKG\`"
+            echo "- اسم التطبيق: \`$LABEL\`"
+            echo "- الأيقونة: \`$ICON\`"
+            echo "- الحجم: $(du -h "$APK" | cut -f1)"
+            echo "- التوقيع: سليم"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: نقل الـAPK إلى مجلد APK/
         run: |
