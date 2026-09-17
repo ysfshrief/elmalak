@@ -1,42 +1,57 @@
 # ملف التطبيق (APK)
 
-هنا يوضع ملفُ تطبيق أندرويد الجاهز للتثبيت:
-
 ```
 APK/Khedmet-El-Malak.apk
 ```
 
-## لماذا ليس موجودًا بعد؟
+| | |
+|---|---|
+| اسم التطبيق | **Khedmet El Malak** |
+| معرّف الحزمة | `com.khedmetelmalak.app` |
+| النسخة | 1.0.0 (versionCode 1) |
+| الموقع الذي يفتحه | `https://elmalak-sillk.vercel.app/` |
+| أدنى أندرويد | 6.0 (API 23) |
+| الحجم | ‎3.1 ميجابايت |
+| التوقيع | ذاتيّ (v1 + v2/v3) |
 
-بناءُ أي تطبيق أندرويد يحتاج **حزمة تطوير أندرويد (Android SDK)**: ملفُّ المنصّة
-`android.jar` وأدوات `aapt2` و`d8` و`apksigner`. وهذه كلُّها تُنزَّل من مضيف
-واحد هو `dl.google.com`، وهو **محجوبٌ بسياسة الشبكة في البيئة التي كُتب فيها
-هذا المشروع** (يردّ الوسيطُ بـ403 على الاتصال به). فلا يمكن بناء الملف هناك،
-ولا يصحّ أن يوضع هنا ملفٌ لم يُبنَ فعلًا.
+التطبيق **لا يحمل نسخةً من الموقع**: يفتح المنشور على العنوان أعلاه. فتعديلُ
+الموقع ونشرُه يصل إلى الأجهزة بلا ملفٍّ جديد.
 
-أمّا مشروع أندرويد نفسه فمكتملٌ في `android/`، وينقصه أمران: عنوانُ الموقع،
-وجهازٌ عنده الحزمة.
+## التثبيت
 
-## الطريق الأول: خوادم GitHub (بلا تثبيت شيء على جهازك)
+انقل الملف إلى الهاتف وافتحه. أندرويد سيسأل عن السماح بالتثبيت من هذا المصدر
+(التطبيق ليس على متجر Play) — اسمح، ثم ثبّت.
 
-خوادم GitHub تأتي بحزمة أندرويد مثبّتة. في المستودع تدفّقُ عملٍ جاهز:
+## إعادة البناء
 
-1. افتح تبويب **Actions** في المستودع.
-2. اختر **«بناء تطبيق أندرويد»** ثم **Run workflow**.
-3. ضع عنوان موقعك المنشور (مثال: `https://elmalak.vercel.app`).
-4. بعد دقائق:
-   - يُرفع الملف كمخرَج للتنزيل (Artifacts)،
-   - ويُحفظ هنا في `APK/Khedmet-El-Malak.apk`،
-   - وتُطبع **بصمةُ التوقيع** في ملخّص التشغيل — انسخها إلى متغيّر البيئة
-     `ANDROID_CERT_SHA256` على الموقع، فيختفي شريطُ العنوان داخل التطبيق.
+تبويب **Actions** ← **«بناء تطبيق أندرويد»** ← **Run workflow**. العنوان يُقرأ
+من `android/gradle.properties`، والملف الناتج يحلّ محلّ هذا الملف هنا.
 
-## الطريق الثاني: جهازك
+أو على جهازك (يحتاج Java 17 وAndroid SDK):
 
 ```bash
 cd android
-./gradlew assembleRelease -PWEBSITE_URL=https://your-site.example
-# الناتج: android/app/build/outputs/apk/release/Khedmet-El-Malak-release.apk
-cp android/app/build/outputs/apk/release/*.apk APK/Khedmet-El-Malak.apk
+./gradlew assembleRelease
+cp app/build/outputs/apk/release/*.apk ../APK/Khedmet-El-Malak.apk
 ```
 
-يحتاج: Java 17 وAndroid SDK (أو Android Studio، وهو يجلبها).
+## ⚠ مفتاح التوقيع
+
+هذا البناء موقَّعٌ بمفتاح تطويرٍ وُلِّد أثناء البناء، فهو يُثبَّت ويعمل، لكن:
+
+- كلُّ بناءٍ لاحق سيحمل توقيعًا مختلفًا، فلن يُحدِّث المثبَّت على الأجهزة
+  (سيُطلب حذف القديم أولًا)،
+- وبصمةُ `ANDROID_CERT_SHA256` على الموقع ستبطل، فيعود شريط العنوان.
+
+للحلّ مرةً واحدة وإلى الأبد:
+
+```bash
+keytool -genkeypair -v -keystore khedmet.jks -alias khedmet \
+  -keyalg RSA -keysize 2048 -validity 10000
+base64 -w0 khedmet.jks      # ضع الناتج في سرّ ANDROID_KEYSTORE_BASE64
+```
+
+ثم في **Settings → Secrets and variables → Actions**:
+`ANDROID_KEYSTORE_BASE64`، `ANDROID_KEYSTORE_PASSWORD`، `ANDROID_KEY_ALIAS`،
+`ANDROID_KEY_PASSWORD`. واحفظ ملف `khedmet.jks` في مكانٍ آمن ولا ترفعه إلى
+المستودع — ضياعُه يعني أن التطبيق لن يُحدَّث أبدًا.
