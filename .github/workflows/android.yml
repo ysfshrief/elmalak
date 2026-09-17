@@ -40,7 +40,18 @@ jobs:
           java-version: "17"
 
       - name: تهيئة حزمة أندرويد
-        uses: android-actions/setup-android@v3
+        run: |
+          # لا تُستعمل إضافةٌ خارجية هنا: `android-actions/setup-android` تطلب
+          # حزمة `tools` القديمة التي أُزيلت من مستودع جوجل، فتفشل. وصورةُ
+          # ubuntu-latest تأتي بحزمة أندرويد مثبّتةً أصلًا، فتُستعمل كما هي
+          # ويُضاف إليها ما ينقص فقط.
+          set -e
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          SDKMANAGER=$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -1)
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0" > /dev/null
+          echo "المنصّات: $(ls "$ANDROID_HOME/platforms")"
+          echo "أدوات البناء: $(ls "$ANDROID_HOME/build-tools")"
 
       - name: تحديد عنوان الموقع
         id: site
@@ -110,7 +121,7 @@ jobs:
           "$BUILD_TOOLS/apksigner" verify --verbose "$APK"
 
           echo "— بطاقة التطبيق —"
-          BADGING=$("$BUILD_TOOLS/aapt2" dump badging "$APK")
+          BADGING=$("$BUILD_TOOLS/aapt2" dump badging "$APK" 2>/dev/null || "$BUILD_TOOLS/aapt" dump badging "$APK")
           echo "$BADGING" | head -20
 
           PKG=$(echo "$BADGING" | grep -oP "package: name='\K[^']+")
@@ -121,7 +132,7 @@ jobs:
           test "$LABEL" = "Khedmet El Malak" || { echo "::error::اسم التطبيق غير متوقّع: $LABEL"; exit 1; }
 
           echo "— العنوان داخل الملف —"
-          "$BUILD_TOOLS/aapt2" dump strings "$APK" | grep -i "elmalak-sillk" | head -3 \
+          "$BUILD_TOOLS/aapt2" dump strings "$APK" 2>/dev/null | grep -i "elmalak-sillk" | head -3 \
             || { echo "::error::عنوان الموقع غير موجود داخل الملف"; exit 1; }
 
           echo "— لا نسخة من الموقع بداخله —"
